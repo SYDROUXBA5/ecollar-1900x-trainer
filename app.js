@@ -282,6 +282,11 @@
   function embedded(name) {
     var e = EMBEDDED[name];
     if (!e) return Promise.reject(new Error('no embedded copy of ' + name));
+    // Already present? Then it was inlined ahead of us — the single-file build
+    // concatenates the base64 straight into the page, and there is no
+    // models-*.js beside it to fetch. Asking for one would 404 and reject a
+    // mesh we are already holding.
+    if (window[e.key]) return Promise.resolve(window[e.key]);
     return loadScript(e.src).then(function () {
       if (!window[e.key]) throw new Error(e.src + ' held no ' + name);
       return window[e.key];
@@ -2648,6 +2653,9 @@
   function ensureModule(tab) {
     var src = MODULE_SRC[tab];
     if (!src) return Promise.resolve(false);
+    // The single-file build concatenates the modules into the page ahead of us
+    // and marks them here, because there is no nomen.js beside it to fetch.
+    if (window.EC_INLINED) return Promise.resolve(true);
     if (moduleTried[src]) return moduleTried[src];
     moduleTried[src] = loadScript(src)
       .then(function () { return true; })
