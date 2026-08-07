@@ -1,0 +1,15 @@
+.DS_Store
+
+# Dogtra's manual is their copyright — it stays on the machine, it does not get
+# republished. _work/MANUAL-FACTS.md carries what the app needed from it, in our
+# own words, with page citations so anyone can check against their own copy.
+_work/1900X-manual.pdf
+_work/manual-1900X.txt
+
+# Photographs of the owner's own unit and the Highland Canine sign. Local only.
+_work/photos/
+
+# Superseded: this carried BOTH units in one 3.8 MB file, so opening tab 1 parsed
+# the transmitter nobody asked for. Split into models-receiver.js and
+# models-transmitter.js. Nothing loads it any more.
+models.js

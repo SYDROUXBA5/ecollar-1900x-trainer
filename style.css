@@ -1,0 +1,2036 @@
+/* ============================================================================
+   DOGTRA 1900X · Highland Canine Training — shell stylesheet
+   Owner: SHELL. Module rules live here too (contract), added as they land.
+
+   ── PALETTE, AND WHY IT CHANGED ────────────────────────────────────────────
+   CONTRACT.md still says the brand is #1560A6 / #CF8B3E and calls those
+   "measured". They are not what the sign measures. Two independent readings of
+   _work/photos/LOGO.png now disagree with the contract and agree with each
+   other, so the contract needs correcting at source — this file records the
+   method so the next person can repeat it rather than take it on trust.
+
+     method   rotate LOGO.png upright; fit a quadratic illumination field to the
+              low-saturation paper pixels and divide it out (a single white
+              point is not enough — the sign is lit unevenly, 187,174,158 top
+              left against 153,143,131 bottom left); split blue from orange by
+              hue; erode 5 px so no antialiased edge pixel is counted; drop the
+              top and bottom luminance tails so vinyl gloss cannot pull the
+              median; take the median per 150 px tile and then the median of
+              those tiles.
+     result   blue  #196EBF … #1A71BF        orange  #EF9C43 … #F8A143
+     critic's independent reading (six white points, 50th–99th pct):
+              blue  #1D6AAE … #2075C1        orange  #E89D45 … #FFAD4C
+     shipped  blue  #1C70B9                  orange  #F1A046
+              — the midpoint of the two readings, inside both ranges.
+
+   The rest of the family is derived from those two by holding hue and
+   saturation and moving lightness only, so there is one decision, not six:
+     blue-d  L 32 %   white text on it, 7.6:1
+     blue-t  L 94 %   wash
+     orange-d L 36 %  5.1:1 on white — the only orange allowed to carry text
+     orange-t L 93 %  wash
+   Orange never carries body text: at brand lightness it is 2.1:1 on paper. It
+   marks, it does not explain.
+   ========================================================================== */
+
+@font-face{
+  font-family:'HC Serif';
+  src:url('vendor/playfair.woff2') format('woff2');
+  font-weight:700;
+  font-style:normal;
+  font-display:swap;
+}
+
+:root{
+  /* brand — see the note above before changing any of these six */
+  --hc-blue:#1C70B9;
+  --hc-blue-d:#15568E;
+  --hc-blue-t:#E4F0FB;
+  --hc-orange:#F1A046;
+  --hc-orange-d:#9F5E14;
+  --hc-orange-t:#FCEEDE;
+
+  /* paper */
+  --paper:#FFFFFF;
+  --stage:#F3F2EE;
+  --stage-edge:#EBE9E3;
+  --line:#E3E1DA;
+  --line-soft:#EFEDE7;
+
+  /* ink */
+  --ink:#1B1E22;
+  --ink-2:#565B62;
+  --ink-3:#878C93;
+
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --serif:'HC Serif',"Playfair Display","Iowan Old Style",Georgia,"Times New Roman",serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --r:10px;
+  --shadow-1:0 1px 2px rgba(27,30,34,.05), 0 4px 14px rgba(27,30,34,.06);
+  --shadow-2:0 2px 6px rgba(27,30,34,.07), 0 18px 44px rgba(27,30,34,.13);
+  --top-h:52px;
+  --tabs-h:50px;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+
+html,body{
+  height:100%;
+  margin:0;
+  overflow:hidden;              /* app shell: every scroller is internal */
+}
+
+body{
+  background:var(--stage);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  -webkit-text-size-adjust:100%;
+}
+
+button{font:inherit;color:inherit;margin:0;border:0;background:none;cursor:pointer}
+h1,h2,h3,p,ol,ul{margin:0}
+ol,ul{padding:0;list-style:none}
+
+:focus-visible{
+  outline:2px solid var(--hc-blue);
+  outline-offset:2px;
+  border-radius:4px;
+}
+
+.sr{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
+}
+
+.skip{
+  position:absolute;left:8px;top:-60px;z-index:200;
+  background:var(--hc-blue);color:#fff;text-decoration:none;
+  padding:9px 14px;border-radius:8px;font-size:13.5px;font-weight:600;
+  transition:top .14s ease;
+}
+.skip:focus{top:8px}
+
+/* ── frame ─────────────────────────────────────────────────────────────── */
+
+.app{
+  display:flex;
+  flex-direction:column;
+  height:100%;
+  min-height:0;
+}
+
+/* ── identity bar ──────────────────────────────────────────────────────── */
+
+.top{
+  order:1;flex:0 0 auto;
+  display:flex;align-items:center;gap:14px;
+  height:var(--top-h);
+  padding:0 16px;
+  padding-left:max(16px,env(safe-area-inset-left));
+  padding-right:max(16px,env(safe-area-inset-right));
+  background:var(--paper);
+  border-bottom:1px solid var(--line);
+  position:relative;z-index:30;
+}
+
+.brand{display:flex;align-items:center;gap:10px;flex:0 0 auto;min-width:0}
+/* THE MARK HAS A CEILING.
+   It is a contour trace of a vinyl sign, regularised (see the long note in
+   index.html) so its stems, serifs and the bowl of the 9 are true geometry
+   rather than tracer jitter. What regularising cannot invent is detail the
+   photograph never held: the dog's head in the H's counter is as sharp as a
+   1 200 px picture of a sign lets it be. Below 44 px it is exact; above it,
+   it would start to be judged as a drawing. So this is a hard cap and not a
+   default — anything that needs the brand bigger sets the words instead. */
+.mark{height:31px;max-height:44px;width:auto;display:block;flex:0 0 auto;overflow:visible}
+.mk-h{fill:var(--hc-blue)}
+.mk-k{fill:var(--hc-orange)}
+
+.wm{display:flex;flex-direction:column;justify-content:center;min-width:0}
+.wm b{
+  font-family:var(--serif);font-weight:700;
+  font-size:13.5px;line-height:1.05;letter-spacing:.11em;
+  color:var(--hc-blue);text-transform:uppercase;
+}
+.wm i{
+  font-style:normal;font-size:8.5px;line-height:1.5;
+  letter-spacing:.165em;text-transform:uppercase;
+  color:#4F6D87;font-weight:600;
+}
+
+.unit{
+  display:flex;flex-direction:column;justify-content:center;
+  min-width:0;flex:1 1 auto;
+  padding-left:14px;
+  border-left:1px solid var(--line-soft);
+}
+.unit b{
+  font-size:12px;font-weight:700;letter-spacing:.1em;line-height:1.25;
+  color:var(--ink);text-transform:uppercase;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.unit span{
+  font-size:11px;line-height:1.35;color:var(--ink-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+.offline{
+  flex:0 0 auto;display:flex;align-items:center;gap:6px;
+  font-size:11.5px;font-weight:600;letter-spacing:.02em;color:var(--ink-2);
+  background:var(--stage);border:1px solid var(--line);
+  padding:5px 10px 5px 8px;border-radius:999px;white-space:nowrap;cursor:default;
+}
+.offline .dot{
+  width:7px;height:7px;border-radius:50%;flex:0 0 auto;
+  background:#2E9E63;box-shadow:0 0 0 3px rgba(46,158,99,.16);
+}
+
+/* ── section rail ──────────────────────────────────────────────────────── */
+
+.tabs{
+  order:2;flex:0 0 auto;
+  display:flex;align-items:stretch;
+  height:var(--tabs-h);
+  background:var(--paper);
+  border-bottom:1px solid var(--line);
+  padding:0 8px;
+  padding-left:max(8px,env(safe-area-inset-left));
+  padding-right:max(8px,env(safe-area-inset-right));
+  position:relative;z-index:20;
+}
+
+.tab{
+  position:relative;
+  display:flex;align-items:center;gap:8px;
+  padding:0 15px;
+  color:var(--ink-2);
+  white-space:nowrap;
+  transition:color .13s ease, background-color .13s ease;
+  border-radius:8px 8px 0 0;
+}
+.tab:hover{color:var(--ink);background:var(--stage)}
+.tab::after{
+  content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:2px;
+  background:var(--hc-blue);border-radius:2px 2px 0 0;
+  transform:scaleX(0);transform-origin:50% 50%;
+  transition:transform .16s ease;
+}
+.tab[aria-selected="true"]{color:var(--hc-blue)}
+.tab[aria-selected="true"]::after{transform:scaleX(1)}
+.tab[aria-selected="true"]:hover{background:transparent}
+
+.ti{width:19px;height:19px;flex:0 0 auto;fill:none;stroke:currentColor;
+    stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+.tab[aria-selected="true"] .ti{opacity:1}
+
+.tk{
+  font-size:10px;font-weight:700;letter-spacing:.08em;
+  color:var(--ink-3);font-variant-numeric:tabular-nums;
+}
+.tab[aria-selected="true"] .tk{color:var(--hc-orange-d)}
+.tl{
+  font-size:13.5px;font-weight:600;letter-spacing:.005em;
+  overflow:hidden;text-overflow:ellipsis;
+}
+
+/* The DRILLS divider. It is a SIBLING of the tabs, not a child of tab 03 —
+   inside the button it forced the selected underline to be nudged by a
+   hard-coded 78px, which detached from the label the moment the font fell
+   back. As a sibling it lays itself out and the underline rule stays honest. */
+.tgap{
+  display:flex;align-items:center;gap:9px;
+  padding:0 13px 0 10px;flex:0 0 auto;
+}
+.tgap i{display:block;width:1px;height:22px;background:var(--line)}
+.tgap b{
+  font-size:9px;font-weight:700;letter-spacing:.19em;text-transform:uppercase;
+  color:var(--hc-orange-d);white-space:nowrap;
+}
+
+/* ── no-WebGL banner ───────────────────────────────────────────────────── */
+
+.noglbar{
+  order:3;flex:0 0 auto;
+  padding:10px 16px;
+  padding-left:max(16px,env(safe-area-inset-left));
+  padding-right:max(16px,env(safe-area-inset-right));
+  background:var(--hc-orange-t);
+  border-bottom:1px solid #EFD3B4;
+  font-size:12.5px;line-height:1.5;color:#734512;
+}
+.noglbar[hidden]{display:none}
+.noglbar strong{font-weight:700;margin-right:6px;color:#5A3D11}
+
+/* ── stage ─────────────────────────────────────────────────────────────── */
+
+.stage{
+  order:4;flex:1 1 auto;min-height:0;
+  position:relative;
+  overflow:hidden;
+  background:
+    radial-gradient(118% 88% at 50% 34%,
+      #FFFFFF 0%, #F6F5F1 55%, var(--stage-edge) 100%);
+}
+
+.pane{
+  position:absolute;inset:0;
+  overflow:hidden;              /* a module that needs scroll makes its own */
+  display:none;
+}
+.pane:not([hidden]){display:block}
+.pane:focus{outline:none}
+
+/* ── loading veil ──────────────────────────────────────────────────────────
+   ONE PER PANE, built by app.js inside the pane that asked for the mesh. It
+   used to be a single element inside .stage covering all four panes at once,
+   which meant one damaged mesh replaced the whole app — including the two
+   tabs that never needed it. It is inset:0 within its own pane only.        */
+
+.veil{
+  position:absolute;inset:0;z-index:40;
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;
+  background:rgba(246,245,241,.9);
+  -webkit-backdrop-filter:saturate(1.1) blur(2px);
+  backdrop-filter:saturate(1.1) blur(2px);
+}
+.veil[hidden]{display:none}
+.veil-card{
+  width:100%;max-width:360px;text-align:center;
+  background:var(--paper);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow-1);padding:20px 22px 22px;
+}
+.veil-t{font-size:15px;font-weight:600;color:var(--ink)}
+.veil-d{font-size:12.5px;line-height:1.5;color:var(--ink-3);margin-top:5px}
+.veil-bar{
+  margin-top:15px;height:4px;border-radius:999px;
+  background:var(--line-soft);overflow:hidden;
+}
+.veil-bar[hidden]{display:none}
+.veil-bar i{
+  display:block;height:100%;width:38%;border-radius:999px;
+  background:linear-gradient(90deg,var(--hc-blue),#3892E1);
+  animation:slide 1.15s ease-in-out infinite;
+}
+@keyframes slide{
+  0%{transform:translateX(-105%)}
+  100%{transform:translateX(300%)}
+}
+.veil.err .veil-t{color:var(--hc-orange-d)}
+
+/* the way out of a failed mesh. Without it the error card was a dead end. */
+.veil-go{
+  margin-top:16px;width:100%;
+  background:var(--hc-blue);color:#fff;
+  font-size:13.5px;font-weight:600;
+  padding:9px 14px;border-radius:8px;
+}
+.veil-go[hidden]{display:none}
+.veil-go:hover{background:var(--hc-blue-d)}
+
+/* ── a module's problem, said where the student is ─────────────────────── */
+
+.pnote{
+  position:absolute;left:0;right:0;bottom:0;z-index:35;
+  display:flex;align-items:center;gap:14px;
+  padding:11px 16px;
+  padding-left:max(16px,env(safe-area-inset-left));
+  padding-right:max(16px,env(safe-area-inset-right));
+  padding-bottom:max(11px,env(safe-area-inset-bottom));
+  background:var(--hc-orange-t);border-top:1px solid #EFD3B4;
+}
+.pnote-t{flex:1 1 auto;min-width:0;font-size:12.5px;line-height:1.5;color:#734512}
+.pnote-x{
+  flex:0 0 auto;font-size:12px;font-weight:700;color:var(--hc-orange-d);
+  padding:5px 9px;border-radius:6px;border:1px solid #E7C9A6;
+}
+.pnote-x:hover{background:#F7E3CC}
+
+@media (prefers-reduced-motion:reduce){
+  .veil-bar i{animation:none;width:100%;opacity:.5}
+  .tab::after{transition:none}
+  .skip{transition:none}
+  .pi{transition:none}
+  .hs,.hs-dot{transition:none}
+  .hs::after{animation:none;opacity:0}
+}
+
+/* ============================================================================
+   THE SHARED 3D STAGE  (EC.stage)
+   Every module draws into one of these. The hotspot styles below are the
+   published contract: solve legibility here once, not three times.
+   ========================================================================== */
+
+/* NOTHING IN THE STAGE IS TEXT TO BE SELECTED. A mouse drag here turns the
+   model; without this it also ran a document text selection, and one drag left
+   2 370 characters highlighted — the title, the part index and the whole
+   reading column went blue. touch-action:none below already covered the touch
+   path; user-select plus a preventDefault on mousedown in app.js covers the
+   mouse path, which was the unguarded one. */
+.st,.st-cv,.st-lead,.hs-layer,.hs,.st-hint{
+  -webkit-user-select:none;user-select:none;
+}
+
+.st{position:relative;width:100%;height:100%;min-height:0;overflow:hidden}
+.st[hidden]{display:none}
+.st-fill{position:absolute;inset:0}
+.st-cv{display:block;width:100%;height:100%;touch-action:none}
+
+.st-lead{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+/* NOT overflow:hidden. It used to be, and it did not protect anything — it
+   AMPUTATED: "01 Strap" rendered as "01 Stra", pill 05 cut down the middle.
+   Cropping a label is not a safety net, it is the failure. The solver in app.js
+   now sizes the placement ring so that a pill centred anywhere on it is wholly
+   inside this box by construction, so there is nothing left to crop; and .st
+   above still clips, which is the backstop that keeps a runaway pill out of the
+   page's own scroll width. Leaving this visible also lets the pulse ring
+   breathe on a pill near the edge. */
+.hs-layer{position:absolute;inset:0;pointer-events:none;overflow:visible}
+
+/* Held until the first hotspot layout pass has actually placed the pills.
+   Entering a tab used to paint the leader lines one beat early: five long black
+   lines running off the bottom of the model to nothing, with no pills on their
+   ends. app.js lifts this in the same frame the pills get their positions. */
+.st-unlaid .st-lead,
+.st-unlaid .hs-layer{visibility:hidden}
+
+/* Both units are almost entirely black, so a dark leader disappears the moment
+   it crosses the model and only reads against the pale background. Each leader
+   is drawn twice: a pale casing underneath, then the line on top. The casing is
+   the page colour, so it is invisible over the background and becomes a bright
+   halo exactly where it is needed — over the housing. Every casing is painted
+   before every line, so crossing leaders never cut each other. */
+.st-lead .cas{stroke:#F6F5F1;stroke-width:5;opacity:.95;stroke-linecap:round}
+.st-lead .ln{stroke:#232323;stroke-width:1.7;opacity:.95;stroke-linecap:round}
+.st-lead .ln.is-at{stroke:var(--hc-blue);stroke-width:2.6;opacity:1}
+
+/* ── BEHIND, NOT FADED ─────────────────────────────────────────────────────
+   There used to be an `.occluded` state at .34 opacity. On the orange pill that
+   composited #3A2A0C on #F1A046 to about 1.9:1 — a blob, not a number — and it
+   was pointing at a part that was not in the picture at all. A label for
+   something you cannot see is not a faint label, it is a wrong one, so app.js
+   now takes the whole marker out of the layer and the part's row in the index
+   says "turn to see" instead.
+
+   ONE marker is allowed to survive being round the back: the current one, which
+   the student asked for by name and must not lose mid-turn. `.behind` is what
+   says so — a dashed leader and a hollow dot. Nothing else ever wears it. */
+.st-lead .ln.behind{stroke-dasharray:4 4}
+.st-lead .cas.behind{opacity:.55}
+
+/* the small dot that marks the exact point on the part */
+.hs-dot{
+  position:absolute;transform:translate(-50%,-50%);
+  width:9px;height:9px;border-radius:50%;
+  background:var(--ink);border:2px solid #fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.4);pointer-events:none;
+  transition:background-color .18s ease,opacity .18s ease;
+}
+.hs-dot.is-at{background:var(--hc-blue)}
+.hs-dot.behind{background:#fff;box-shadow:0 0 0 2px var(--hc-blue) inset,0 1px 3px rgba(0,0,0,.4)}
+
+/* The numbered pill, sitting clear of the model at the end of its leader.
+   Solid fill and a white keyline, never text floating on the render — that is
+   what keeps it readable over both a black housing and a white background. */
+.hs{
+  position:absolute;transform:translate(-50%,-50%);z-index:2;
+  pointer-events:auto;cursor:pointer;
+  display:flex;align-items:center;gap:0;
+  height:30px;min-width:30px;padding:0;border-radius:999px;
+  background:var(--hc-orange);color:#3A2A0C;
+  border:2.5px solid #fff;box-shadow:0 2px 8px rgba(43,43,43,.32);
+  transition:background-color .18s ease,color .18s ease,opacity .18s ease;
+  will-change:left,top;
+}
+.hs-n{
+  flex:0 0 auto;width:25px;text-align:center;
+  font-size:12.5px;font-weight:700;letter-spacing:.01em;
+  font-variant-numeric:tabular-nums;
+}
+/* the name rides out only on the current part, so twelve pills do not become
+   twelve overlapping words */
+.hs-label{display:none;padding-right:11px;font-size:12.5px;font-weight:600;
+  white-space:nowrap;line-height:1}
+.hs::after{
+  content:"";position:absolute;inset:-7px;border-radius:999px;
+  border:2px solid var(--hc-orange);opacity:.65;
+  animation:hspulse 2.4s ease-out infinite;
+}
+@keyframes hspulse{
+  0%{transform:scale(.74);opacity:.65}
+  70%{transform:scale(1.28);opacity:0}
+  100%{opacity:0}
+}
+/* Off the screen, still in the layout. app.js reads offsetWidth off these to
+   place them, and display:none reports zero — see hidePill(). visibility also
+   takes them out of the pointer path, which is what a hidden pill needs. */
+.hs-off{visibility:hidden}
+.hs:hover{background:#E08C2A}
+/* The active pill outranks the chrome. It is the one label that must always be
+   readable, and round 4 had it sitting entirely underneath the Reset chip —
+   92x25 px of overlap on a 92 px pill, one hundred per cent covered. The solver
+   is what actually keeps them apart (both chips are fed to it as occupied
+   rectangles); this is the backstop, and it fails in the right direction. */
+.hs.is-at{background:var(--hc-blue);color:#fff;z-index:7}
+.hs.is-at .hs-label{display:block}
+.hs.is-at::after{animation:none;opacity:0}
+/* THE ACTIVE PILL CAN NEVER BE WIDER THAN THE STAGE IT STANDS ON.
+   app.js solves this pill FIRST and hands it to every later pass as blocked
+   ground, which is what guarantees it is never dropped — but that guarantee
+   rests on there being somewhere inside the layer it actually fits. A 240 px
+   name on a 300 px phone stage has nowhere. Capping it here is what keeps the
+   guarantee true at every width; the name then ellipses, and the full name is
+   a row in the part index two centimetres away. */
+.hs{max-width:calc(100% - 16px)}
+.hs.is-at .hs-label{min-width:0;overflow:hidden;text-overflow:ellipsis}
+
+/* recentre, in words. BAR.md's read of BioDigital is that its own recentre
+   affordance is small, low contrast and not obvious; ours says what it does. */
+.st-tools{
+  position:absolute;right:10px;top:10px;z-index:5;
+  display:flex;gap:6px;
+}
+.st-btn{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(255,255,255,.94);border:1px solid var(--line);
+  color:var(--ink-2);font-size:11.5px;font-weight:600;
+  padding:6px 10px 6px 8px;border-radius:999px;box-shadow:var(--shadow-1);
+  white-space:nowrap;
+}
+.st-btn:hover{color:var(--hc-blue);border-color:#C9DEF2}
+.st-bi{width:14px;height:14px;flex:0 0 auto;fill:none;stroke:currentColor;
+  stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+/* Now that the subject fills the pane, the hint sits over the model rather than
+   over paper, so it carries its own ground. */
+.st-hint{
+  position:absolute;left:0;right:0;bottom:8px;z-index:3;text-align:center;
+  font-size:10.5px;letter-spacing:.03em;color:var(--ink-3);
+  pointer-events:none;
+}
+.st-hint span{
+  display:inline-block;padding:3px 11px;border-radius:999px;
+  background:rgba(255,255,255,.82);
+}
+
+/* ============================================================================
+   THE WRITTEN REFERENCE
+   Every pane carries this from the moment the page opens. It is the no-WebGL
+   fallback, and it is also what a pane shows until its module claims it — so
+   the stage is never blank and never shows a student a scaffold.
+   ========================================================================== */
+
+.ref{
+  height:100%;
+  display:flex;flex-direction:column;
+  min-height:0;
+  --st-h:0px;                   /* no 3D stage unless .has3d says otherwise */
+}
+/* HIDDEN, not removed. A module hides it when it claims the pane; a mesh that
+   turns out to be unreadable brings it straight back. */
+.ref[hidden]{display:none}
+
+.ref-top{
+  flex:0 0 auto;
+  padding:22px 26px 16px;
+  padding-left:max(26px,env(safe-area-inset-left));
+  padding-right:max(26px,env(safe-area-inset-right));
+  border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(255,255,255,.86),rgba(255,255,255,0));
+}
+.ref-top-in{max-width:1180px;margin:0 auto}
+.ref-k{
+  display:flex;align-items:center;gap:9px;
+  font-size:10.5px;font-weight:700;letter-spacing:.17em;text-transform:uppercase;
+  color:var(--hc-orange-d);
+}
+.ref-k i{
+  display:block;width:16px;height:1.5px;background:var(--hc-orange);
+  flex:0 0 auto;border-radius:2px;
+}
+.ref-h{
+  font-family:var(--serif);font-weight:700;
+  font-size:29px;line-height:1.1;letter-spacing:.002em;color:var(--ink);
+  margin-top:7px;
+}
+.ref-s{font-size:14.5px;color:var(--ink-2);margin-top:5px;max-width:60ch}
+
+.ref-miss{
+  margin-top:13px;padding:10px 13px;
+  background:var(--hc-orange-t);border-radius:8px;
+  border-left:3px solid var(--hc-orange);
+  font-size:12.5px;line-height:1.55;color:#734512;max-width:74ch;
+}
+.ref-miss b{font-weight:700}
+
+.ref-body{flex:1 1 auto;min-height:0}
+
+/* ── nomenclature: part index · 3D stage · reading column ───────────────── */
+
+.ref-nom .ref-body{
+  display:grid;
+  grid-template-columns:minmax(230px,25%) 1fr;
+}
+/* With a stage there are three things to place, so the layout depends on how
+   much width there is. Below 1180 the index keeps a full-height left rail and
+   the model sits ABOVE the reading column — three real columns at that width
+   squeeze the measure below readability. */
+.ref-nom.has3d .ref-body{
+  grid-template-columns:minmax(190px,24%) minmax(0,1fr);
+  grid-template-rows:minmax(0,44%) minmax(0,56%);
+}
+.ref-nom.has3d .pl-wrap{grid-column:1;grid-row:1 / 3}
+.ref-nom.has3d .st-wrap{grid-column:2;grid-row:1;border-bottom:1px solid var(--line)}
+.ref-nom.has3d .dt-wrap{grid-column:2;grid-row:2}
+
+@media (min-width:1180px){
+  .ref-nom.has3d .ref-body{
+    grid-template-columns:minmax(205px,19%) minmax(0,1.2fr) minmax(330px,0.9fr);
+    grid-template-rows:100%;
+  }
+  .ref-nom.has3d .pl-wrap{grid-row:1}
+  .ref-nom.has3d .st-wrap{
+    grid-column:2;grid-row:1;
+    border-bottom:0;border-right:1px solid var(--line);
+  }
+  .ref-nom.has3d .dt-wrap{grid-column:3;grid-row:1}
+}
+
+.st-wrap{position:relative;min-width:0;min-height:0;overflow:hidden}
+/* .has3d comes off when a mesh turns out to be unreadable. The reading column
+   takes the stage's width back rather than sitting beside an empty box. */
+.ref-nom:not(.has3d) .st-wrap{display:none}
+
+/* THE INDEX SAYS HOW LONG IT IS.
+   At 1180x820 this was 714 px of rows inside 595 px of column, with no
+   scrollbar, no fade and no count: parts 11 and 12 were reachable and entirely
+   invisible, and the column read as a list that ends at 10. Three things fix
+   it — a scrollbar that is actually drawn, a gradient so the cut edge does not
+   read as the end of the ink, and a sticky chip that counts what is below and
+   removes itself the moment that count would be a lie. */
+.pl-wrap{
+  position:relative;
+  min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  border-right:1px solid var(--line);
+  background:rgba(255,255,255,.5);
+  padding:10px 0 24px;
+  padding-left:max(0px,env(safe-area-inset-left));
+  scrollbar-width:thin;
+  scrollbar-color:#C8C5BC transparent;
+}
+.pl-wrap::-webkit-scrollbar{width:10px}
+.pl-wrap::-webkit-scrollbar-track{background:transparent}
+.pl-wrap::-webkit-scrollbar-thumb{
+  background:#CFCCC3;border-radius:99px;
+  border:3px solid var(--stage);background-clip:padding-box;
+}
+.pl-wrap::-webkit-scrollbar-thumb:hover{background:#B4B0A6;background-clip:padding-box}
+
+.pl-more{
+  position:sticky;bottom:-24px;z-index:3;
+  display:none;align-items:center;justify-content:center;gap:7px;
+  width:100%;height:44px;margin-bottom:-24px;
+  font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--hc-orange-d);
+  background:linear-gradient(180deg,
+    rgba(248,247,243,0) 0%,rgba(248,247,243,.92) 46%,#F6F5F1 100%);
+}
+.pl-wrap.has-d .pl-more{display:flex}
+.pl-more:hover{color:var(--ink)}
+/* a chevron, drawn rather than a glyph, so no font can fail to have it */
+.pl-more-i{
+  width:7px;height:7px;flex:0 0 auto;margin-top:-4px;
+  border-right:2px solid currentColor;border-bottom:2px solid currentColor;
+  transform:rotate(45deg);
+}
+.pl-t{
+  font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);padding:6px 16px 8px;
+}
+.pl{display:flex;flex-direction:column}
+
+.pi{
+  width:100%;display:flex;align-items:flex-start;gap:10px;
+  padding:9px 14px 9px 13px;text-align:left;
+  border-left:3px solid transparent;
+  transition:background-color .12s ease, border-color .12s ease;
+}
+.pi:hover{background:rgba(255,255,255,.9)}
+.pi-n{
+  flex:0 0 auto;min-width:19px;padding-top:2px;
+  font-size:10.5px;font-weight:700;letter-spacing:.05em;
+  color:var(--ink-3);font-variant-numeric:tabular-nums;
+}
+.pi-b{min-width:0}
+.pi-nm{
+  display:block;font-size:13.5px;font-weight:600;line-height:1.35;
+  color:var(--ink-2);overflow-wrap:anywhere;
+}
+.pi-al{
+  display:block;font-size:11px;line-height:1.4;color:var(--ink-3);
+  margin-top:1px;overflow-wrap:anywhere;
+}
+/* Shown only while that part has no marker on the model — see setHotspots'
+   onState. It is the honest half of "hide, do not fade": the pill is gone
+   because the part is round the back, and this is where it says so. */
+.pi-off{
+  display:none;margin-top:5px;
+  font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--hc-orange-d);
+}
+.pi-off::before{
+  content:"";display:inline-block;vertical-align:-1px;margin-right:5px;
+  width:9px;height:9px;border-radius:50%;
+  border:1.5px solid currentColor;
+  border-right-color:transparent;border-bottom-color:transparent;
+  transform:rotate(35deg);
+}
+.ref-nom.has3d .pi.is-off .pi-off{display:block}
+.pi[aria-current="true"]{
+  background:var(--hc-blue-t);border-left-color:var(--hc-blue);
+}
+.pi[aria-current="true"] .pi-nm{color:var(--hc-blue-d)}
+.pi[aria-current="true"] .pi-n{color:var(--hc-blue)}
+
+/* ── the detail panel ──────────────────────────────────────────────────── */
+
+/* The bottom padding used to be 60vh — half a screen of nothing, present only
+   so the scroll spy could reach the last item. It made the scrollbar lie: the
+   thumb sat around 60 % when the student had read every word. The spy now
+   clamps to the last article when the scroller hits the bottom, so this is
+   ordinary breathing room again. */
+.dt-wrap{
+  min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:8px 30px 26px;
+  padding-right:max(30px,env(safe-area-inset-right));
+  scroll-behavior:auto;
+}
+.dt-col{max-width:70ch;margin:0 auto}
+.dt{
+  padding:22px 0 26px 18px;
+  border-top:1px solid var(--line);
+  border-left:3px solid transparent;
+  margin-left:-18px;
+  transition:border-color .18s ease;
+}
+.dt:first-child{border-top:0}
+.dt.is-at{border-left-color:var(--hc-blue-t)}
+.dt-n{
+  font-family:var(--serif);font-size:15px;line-height:1;
+  color:var(--hc-orange-d);letter-spacing:.06em;
+}
+.dt-nm{
+  font-size:23px;font-weight:600;line-height:1.22;letter-spacing:-.005em;
+  color:var(--ink);margin-top:8px;overflow-wrap:anywhere;
+}
+.dt-al{font-size:12.5px;color:var(--ink-3);margin-top:4px;overflow-wrap:anywhere}
+.dt-rule{
+  height:1px;background:var(--line);margin:16px 0 15px;border:0;
+}
+.dt-tx{font-size:15px;line-height:1.72;color:var(--ink-2);overflow-wrap:anywhere}
+.dt-ref{
+  display:inline-block;margin-top:17px;
+  font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--hc-blue-d);background:var(--hc-blue-t);
+  padding:4px 9px;border-radius:5px;
+}
+.dt-note{
+  margin-top:15px;font-size:13px;line-height:1.6;color:#734512;
+  background:var(--hc-orange-t);border-radius:8px;padding:10px 13px;
+  border-left:3px solid var(--hc-orange);
+}
+.dt-note b{font-weight:700;display:block;font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;margin-bottom:3px;color:var(--hc-orange-d)}
+
+/* ── no 3D: the reading column takes the stage's width ──────────────────────
+   With WebGL off, .st-wrap is display:none and the grid's second track became
+   one very wide box with a 70ch measure floating in the middle of it — about
+   200 px of white between the part rail and the first word, and as much again
+   past the end of every line. The card's sources move out into a margin column
+   and the text is pinned to the rail, so the width is spent rather than left
+   sitting empty where the model used to be.                                 */
+
+@media (min-width:1000px){
+  /* the index has five to twelve short names in it; it does not need a quarter
+     of a 1440 screen just because there is no model to sit beside */
+  .ref-nom:not(.has3d) .ref-body{grid-template-columns:minmax(200px,268px) minmax(0,1fr)}
+  .ref-nom:not(.has3d) .dt-wrap{padding-left:34px}
+  .ref-nom:not(.has3d) .dt-col{max-width:1000px;margin:0}
+  .ref-nom:not(.has3d) .dt{
+    display:flex;align-items:flex-start;gap:12px 46px;flex-wrap:wrap;
+  }
+  .ref-nom:not(.has3d) .dt-main{flex:1 1 34ch;min-width:0;max-width:58ch}
+  .ref-nom:not(.has3d) .dt-meta{
+    flex:0 1 260px;min-width:0;
+    padding-top:4px;border-left:1px solid var(--line-soft);padding-left:22px;
+  }
+  .ref-nom:not(.has3d) .dt-meta .dt-ref{margin-top:0}
+  .ref-nom:not(.has3d) .dt-meta .dt-note{margin-top:12px}
+}
+
+/* ── drills: rule cards then prose ─────────────────────────────────────── */
+
+.ref-drill .ref-body{
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:32px 30px 52px;
+  padding-left:max(30px,env(safe-area-inset-left));
+  padding-right:max(30px,env(safe-area-inset-right));
+}
+.dr-in{
+  max-width:1240px;margin:0 auto;
+  display:grid;gap:26px 44px;align-content:start;
+}
+
+.dr-h{
+  font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);padding-bottom:9px;border-bottom:1px solid var(--line);
+}
+.dr-cards{
+  display:flex;flex-direction:column;gap:14px;margin-top:18px;
+}
+.dr-card{
+  background:var(--paper);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow-1);padding:18px 20px 20px 18px;
+  display:flex;align-items:flex-start;gap:15px;min-width:0;
+}
+.dr-card b{
+  width:26px;height:26px;border-radius:50%;flex:0 0 auto;margin-top:1px;
+  background:var(--hc-blue);color:#fff;
+  font-size:12.5px;font-weight:700;line-height:26px;text-align:center;
+}
+.dr-card-t{min-width:0;display:flex;flex-direction:column;gap:5px}
+.dr-card strong{font-size:16px;font-weight:600;color:var(--ink);line-height:1.3}
+.dr-card span{font-size:14px;line-height:1.62;color:var(--ink-2)}
+
+.dr-sec + .dr-sec{margin-top:34px}
+.dr-cols{margin-top:15px}
+.dr-p{font-size:15px;line-height:1.74;color:var(--ink-2)}
+.dr-p + .dr-p{margin-top:13px}
+.dr-p strong{color:var(--ink);font-weight:600}
+.dr-src{
+  margin-top:13px;font-size:12.5px;line-height:1.6;color:var(--ink-3);
+  border-left:2px solid var(--line);padding-left:12px;
+}
+
+/* ── wide: rules on the left, the reasoning beside them ─────────────────── */
+
+@media (min-width:1000px){
+  .dr-in{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}
+}
+
+/* ── narrow: the rail moves under the thumb ────────────────────────────── */
+
+@media (max-width:859px){
+  .tabs{
+    order:9;                    /* below the stage, in flow — never overlaps */
+    height:auto;
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    border-bottom:0;
+    border-top:1px solid var(--line);
+    padding:0;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .tab{
+    flex-direction:column;justify-content:flex-start;gap:2px;
+    padding:6px 3px 8px;min-width:0;
+    border-radius:0;
+  }
+  .tab::after{left:14%;right:14%;bottom:auto;top:0}
+  /* display:none also takes it out of the four-column grid above */
+  .tgap{display:none}
+  .tk{order:-1;font-size:9px;letter-spacing:.1em;line-height:1.2}
+  .tl{font-size:11px;font-weight:600;max-width:100%}
+  .ti{width:20px;height:20px}
+
+  /* the reference becomes one column with one scroller */
+  .ref-nom .ref-body{
+    display:flex;flex-direction:column;
+    overflow-y:auto;-webkit-overflow-scrolling:touch;
+  }
+  .ref-nom.has3d{--st-h:min(38vh,285px)}
+
+  /* twelve pills in a 414-wide stage: everything comes down a notch */
+  .hs{height:26px;min-width:26px}
+  .hs-n{width:22px;font-size:11.5px}
+  .hs-label{font-size:11.5px;padding-right:9px}
+  /* AND THE NAME STOPS SOMEWHERE. "Nick or Constant (Programmable)" is 227 px
+     of pill on a 414 px stage — over half the width of the picture, laid across
+     the thing it is naming, and it squeezes the placement ring down until the
+     solver has to drop parts to fit. Cut at 150 px here. Nothing is lost: the
+     part run directly under the model carries the full name of the current
+     part, so does the card below it, and so does the pill's own tooltip. */
+  .hs{max-width:150px;overflow:hidden}
+  .hs-label{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .hs-dot{width:8px;height:8px;border-width:1.5px}
+  .st-lead .cas{stroke-width:4}
+  .st-lead .ln{stroke-width:1.5}
+  .st-lead .ln.is-at{stroke-width:2.2}
+
+  /* the model pins to the top of the scroller, so the part you tap is still
+     shown while you read about it */
+  .ref-nom.has3d .st-wrap{
+    order:1;flex:0 0 auto;height:var(--st-h);
+    position:sticky;top:0;z-index:6;
+    border:0;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#fff 0%,#F6F5F1 78%,#F1EFE9 100%);
+  }
+
+  /* THE INDEX IS A HORIZONTAL RUN. Stacked as a column it was 436px tall on
+     the transmitter tab at 414px wide — the first part heading started 597px
+     down a 777px stage, so the student scrolled most of a screen before
+     reading one word. As a run it costs 84px and it never leaves: it sticks
+     directly under the model, and app.js scrolls the current chip into view,
+     so "part 7 of 12" is always answerable. */
+  .pl-wrap{
+    order:2;flex:0 0 auto;
+    overflow:visible;border-right:0;border-bottom:1px solid var(--line);
+    padding:6px 0 0;background:var(--paper);
+    position:sticky;top:var(--st-h);z-index:5;
+  }
+  /* THE RUN SAYS IT IS A RUN. 590 px of chips in a 414 px window, with
+     overflow-x:auto and nothing at all to show for it: part 04 was clipped
+     mid-word at the edge and 05 was simply not there. A fade appears at
+     whichever end still has chips beyond it — app.js sets .has-l / .has-r off
+     the scroll offset — and the chip width is set so one always half-shows. */
+  /* The fade covers the RUN, not the heading above it. Spanning the whole
+     height put the left fade over the "1" of "12 PARTS", so the count — one of
+     the few things on this screen that answers "how much is there" — read as
+     "2 PARTS". It starts under the heading now. */
+  .pl-wrap::before,.pl-wrap::after{
+    content:"";position:absolute;bottom:1px;height:58px;width:46px;z-index:2;
+    pointer-events:none;opacity:0;transition:opacity .15s ease;
+  }
+  .pl-wrap::before{
+    left:0;background:linear-gradient(90deg,
+      var(--paper) 0%,var(--paper) 38%,rgba(255,255,255,0) 100%);
+  }
+  .pl-wrap::after{
+    right:0;background:linear-gradient(270deg,
+      var(--paper) 0%,var(--paper) 38%,rgba(255,255,255,0) 100%);
+  }
+  .pl-wrap.has-l::before,.pl-wrap.has-r::after{opacity:1}
+
+  .pl-t{padding:0 14px 4px;font-size:9px;letter-spacing:.18em}
+  .pl{
+    flex-direction:row;flex-wrap:nowrap;
+    overflow-x:auto;overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    scroll-snap-type:x proximity;
+    scrollbar-width:none;
+  }
+  .pl::-webkit-scrollbar{display:none}
+  .pl li{flex:0 0 auto}
+  .pi{
+    width:110px;height:58px;
+    flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:1px;
+    padding:5px 10px 6px;
+    border-left:0;border-bottom:3px solid transparent;
+    scroll-snap-align:center;
+  }
+  .pi-al{display:none}
+  /* No room for it on a 110px chip, and the vertical cue has no meaning on a
+     horizontal run — the chip carries a left/right fade instead. */
+  .ref-nom.has3d .pi.is-off .pi-off{display:none}
+  .pl-more{display:none !important}
+  .pi.is-off .pi-nm{opacity:.55}
+  .pi-n{padding-top:0;min-width:0}
+  .pi-nm{
+    font-size:11.5px;line-height:1.25;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+  .pi[aria-current="true"]{border-left-color:transparent;border-bottom-color:var(--hc-blue)}
+
+  .dt-wrap{order:3;overflow:visible;padding:6px 20px 40px;
+    padding-left:max(20px,env(safe-area-inset-left));
+    padding-right:max(20px,env(safe-area-inset-right))}
+  .dt{padding-left:0;margin-left:0;border-left:0}
+  .dt.is-at{border-left:0}
+
+  .st-hint{display:none}          /* no hover, no scroll wheel, no room */
+  .st-btn span{display:none}
+  .st-btn{padding:7px;border-radius:50%}
+  .st-bi{width:15px;height:15px}
+  .ref-top{padding:18px 20px 14px;
+    padding-left:max(20px,env(safe-area-inset-left));
+    padding-right:max(20px,env(safe-area-inset-right))}
+  .ref-h{font-size:24px}
+  .ref-drill .ref-body{padding:20px 20px 42px;
+    padding-left:max(20px,env(safe-area-inset-left));
+    padding-right:max(20px,env(safe-area-inset-right))}
+}
+
+@media (max-width:560px){
+  .top{gap:10px;padding-left:max(13px,env(safe-area-inset-left));
+       padding-right:max(13px,env(safe-area-inset-right))}
+  .wm{display:none}
+  .unit{border-left:0;padding-left:0}
+  .ref-h{font-size:22px}
+  .dt-nm{font-size:20px}
+  /* .dr-cards used to carry grid-template-columns:1fr here. It is a flex
+     column, so the property never applied — dead weight, now gone. */
+  .dr-card{padding:15px 16px 17px 15px;gap:13px}
+}
+
+/* only once the words genuinely will not fit does the chip lose them */
+@media (max-width:399px){
+  .offline{padding:6px;gap:0}
+  .offline-t{display:none}
+}
+
+/* ============================================================================
+   ▓▓ TAB 3 · FIT THE COLLAR ▓▓  (owner: FIT — appended, nothing above edited)
+
+   Two halves: the dog on the left, the working rail on the right. The rail is
+   the only scroller, and the section panel is STICKY inside it — a live
+   diagram that scrolls away while you work the control it answers is not a
+   live diagram, and the section is this tab's whole answer to BioDigital's
+   dissect view.
+
+   Pass / near / fail need three colours the brand does not carry. They are
+   scoped to .fit rather than :root so nothing else in the app inherits a
+   traffic light it never asked for. Both the green and the red are dark
+   enough to carry text on paper (5.4:1 and 6.6:1).
+   ========================================================================== */
+
+.fit{
+  --ok:#1B6E45;   --ok-t:#E6F3EC;   --ok-e:#BEDECD;
+  --no:#AE2A20;   --no-t:#FBEAE8;   --no-e:#F0C4BF;
+  --near:var(--hc-orange-d); --near-t:var(--hc-orange-t); --near-e:#F0D6B4;
+  position:absolute;inset:0;
+  display:flex;align-items:stretch;
+  background:var(--paper);
+}
+
+.fit-3d{
+  position:relative;
+  flex:1 1 auto;min-width:0;min-height:0;
+  background:
+    radial-gradient(120% 90% at 46% 38%,
+      #FFFFFF 0%, #F6F5F1 56%, var(--stage-edge) 100%);
+}
+
+.fit-rail{
+  flex:0 0 424px;min-width:0;
+  border-left:1px solid var(--line);
+  background:var(--paper);
+  overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+}
+.fit-rail-in{
+  padding:0 20px 44px;
+  padding-left:max(20px,env(safe-area-inset-left));
+  padding-right:max(20px,env(safe-area-inset-right));
+}
+
+/* ── heading ─────────────────────────────────────────────────────────────── */
+.fit-head{padding:20px 0 15px}
+.fit-k{
+  display:flex;align-items:center;gap:9px;
+  font-size:10.5px;font-weight:700;letter-spacing:.17em;text-transform:uppercase;
+  color:var(--hc-orange-d);
+}
+.fit-k i{display:block;width:16px;height:1.5px;background:var(--hc-orange);
+  flex:0 0 auto;border-radius:2px}
+.fit-h{
+  font-family:var(--serif);font-weight:700;
+  font-size:28px;line-height:1.08;color:var(--ink);margin-top:7px;
+}
+.fit-s{font-size:13.5px;line-height:1.6;color:var(--ink-2);margin-top:6px}
+
+/* ── blocks and segmented pickers ────────────────────────────────────────── */
+.fit-blk{padding:0 0 14px}
+.fit-lab{
+  font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:7px;
+}
+.fit-seg{
+  display:flex;gap:0;
+  border:1px solid var(--line);border-radius:9px;overflow:hidden;
+  background:var(--stage);
+}
+.fit-segb{
+  flex:1 1 0;min-width:0;
+  padding:8px 6px;
+  font-size:12.5px;font-weight:600;line-height:1.25;
+  color:var(--ink-2);text-align:center;
+  border-right:1px solid var(--line);
+  background:transparent;
+}
+.fit-segb:last-child{border-right:0}
+.fit-segb:hover{background:#fff;color:var(--hc-blue)}
+.fit-segb[aria-pressed="true"]{
+  background:var(--hc-blue);color:#fff;
+  box-shadow:inset 0 -2px 0 rgba(0,0,0,.14);
+}
+.fit-note{
+  font-size:12.5px;line-height:1.55;color:var(--ink-2);
+  margin-top:8px;padding-left:11px;border-left:2px solid var(--line);
+}
+
+/* ── the section panel ───────────────────────────────────────────────────── */
+.fit-sec{
+  position:sticky;top:0;z-index:6;
+  margin:0 -20px;padding:10px 20px 8px;
+  background:var(--paper);
+  border-top:1px solid var(--line-soft);
+  border-bottom:1px solid var(--line);
+  box-shadow:0 10px 14px -12px rgba(27,30,34,.28);
+}
+.fit-svg{display:block;width:100%;max-width:452px;height:auto;margin:0 auto}
+.fit-cap{font-size:11px;line-height:1.45;color:var(--ink-3);margin-top:5px}
+
+/* section type. Every colour is a class — nothing is set from JS. */
+.fs-eye{font-size:8.6px;font-weight:700;letter-spacing:.13em;fill:var(--ink-3)}
+.fs-rule{stroke:var(--line);stroke-width:1}
+.fs-div{stroke:var(--line-soft);stroke-width:1}
+.fs-clk{font-size:9.5px;font-weight:700;fill:var(--ink-2)}
+
+.fs-coat{fill:#DCD3C6;stroke:#C2B6A4;stroke-width:1}
+.fs-flesh{fill:#E9C3B7;stroke:none}
+.fs-skinl{fill:none;stroke:#C08C7C;stroke-width:1.2}
+.fs-spine{fill:#F2EDE4;stroke:#BFB4A2;stroke-width:1}
+.fs-pipe{fill:#F7F3EA;stroke:#A99C87;stroke-width:1.3}
+.fs-pipei{fill:#FFFFFF;stroke:#C9BEA9;stroke-width:1}
+.fs-cross{stroke:#8E8375;stroke-width:1;opacity:.7}
+
+/* the zone band, carried on the outline itself rather than on a circle that
+   pretends the neck is round */
+.fs-zone{fill:none;stroke-width:5;stroke-linecap:round;opacity:.9}
+.fs-zone.fs-ok{stroke:var(--ok)}
+.fs-zone.fs-no{stroke:var(--no);opacity:.55}
+.fs-zone.fs-near{stroke:#D8D3C8}
+
+.fs-rxbody{fill:#26292D;stroke:#0E1012;stroke-width:1}
+.fs-rxbody.is-ok{stroke:var(--ok);stroke-width:2}
+.fs-rxbody.is-no{stroke:var(--no);stroke-width:2}
+.fs-rxbody.is-near{stroke:var(--near);stroke-width:2}
+.fs-rxpost{stroke:#9AA0A6;stroke-width:2.6;stroke-linecap:round}
+.fs-rxpost.is-no{stroke:var(--no)}
+.fs-rxpost.is-ok{stroke:#8E959C}
+
+.fs-lens{fill:none;stroke:var(--ink-3);stroke-width:1;stroke-dasharray:3 3}
+.fs-lensk{font-size:9.5px;font-weight:700;fill:var(--ink-2)}
+/* casing under the leader, the same trick the shell uses on hotspot leaders,
+   so the line survives crossing the section at 8 o'clock */
+.fs-lead-h{fill:none;stroke:var(--paper);stroke-width:4.5;stroke-linejoin:round}
+.fs-lead{fill:none;stroke:var(--ink-3);stroke-width:1;stroke-linejoin:round}
+
+.fs-coatb{fill:#DCD3C6;stroke:#C2B6A4;stroke-width:1}
+.fs-strapb{fill:#26292D}
+.fs-skind{stroke:#C08C7C;stroke-width:1.4}
+.fs-postl{stroke-width:5.2;stroke-linecap:butt}
+.fs-postl.is-ok{stroke:#9AA0A6}
+.fs-postl.is-no{stroke:var(--no)}
+.fs-postt.is-ok{fill:#8E959C}
+.fs-postt.is-no{fill:var(--no)}
+.fs-gap{stroke:var(--no);stroke-width:1.2;stroke-dasharray:2.5 2.5}
+.fs-gapt{font-size:9px;font-weight:700;fill:var(--no);letter-spacing:.03em}
+.fs-band{font-size:9px;font-weight:600;fill:var(--ink-3)}
+
+.fs-chip{fill:var(--stage);stroke:var(--line);stroke-width:1}
+.fs-chip.is-ok{fill:var(--ok-t);stroke:var(--ok-e)}
+.fs-chip.is-no{fill:var(--no-t);stroke:var(--no-e)}
+.fs-chip.is-near{fill:var(--near-t);stroke:var(--near-e)}
+.fs-chipt{font-size:10.5px;font-weight:700;fill:var(--ink-2)}
+.fs-chipt.is-ok{fill:var(--ok)}
+.fs-chipt.is-no{fill:var(--no)}
+.fs-chipt.is-near{fill:var(--near)}
+
+/* ── the four decisions ──────────────────────────────────────────────────── */
+.fit-decs{margin-top:16px}
+.fit-dec{padding:13px 0 15px;border-top:1px solid var(--line-soft)}
+.fit-dec:first-child{border-top:0}
+.fit-dec-h{display:flex;align-items:flex-start;gap:10px}
+.fit-dec-n{
+  flex:0 0 auto;width:20px;height:20px;border-radius:50%;
+  background:var(--hc-blue-t);color:var(--hc-blue-d);
+  font-size:11px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  margin-top:1px;
+}
+.fit-dec-l{flex:1 1 auto;min-width:0}
+.fit-dec-l b{display:block;font-size:14.5px;font-weight:600;color:var(--ink);line-height:1.3}
+.fit-dec-l span{display:block;font-size:11.5px;color:var(--ink-3);margin-top:1px}
+.fit-flag{
+  flex:0 0 auto;width:21px;height:21px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;font-style:normal;
+  border:1px solid var(--line);color:var(--ink-3);background:var(--stage);
+}
+.fit-flag.is-ok{background:var(--ok-t);border-color:var(--ok-e);color:var(--ok)}
+.fit-flag.is-no{background:var(--no-t);border-color:var(--no-e);color:var(--no)}
+.fit-flag.is-near{background:var(--near-t);border-color:var(--near-e);color:var(--near)}
+
+.fit-read{font-size:12.5px;line-height:1.5;color:var(--ink-2);margin-top:7px;padding-left:30px}
+.fit-hid{
+  font-size:11.5px;line-height:1.5;color:var(--near);
+  margin-top:8px;margin-left:30px;padding-left:9px;
+  border-left:2px solid var(--hc-orange);
+}
+.fit-mini{
+  margin-top:9px;margin-left:30px;
+  font-size:11.5px;font-weight:600;color:var(--hc-blue-d);
+  border:1px solid #C9DEF2;background:var(--hc-blue-t);
+  padding:5px 11px;border-radius:999px;
+}
+.fit-mini:hover{background:#D3E6F8}
+
+/* ── sliders ─────────────────────────────────────────────────────────────── */
+.fit-range{
+  -webkit-appearance:none;appearance:none;
+  display:block;width:calc(100% - 30px);margin:11px 0 0 30px;
+  height:22px;background:transparent;cursor:pointer;
+}
+.fit-range::-webkit-slider-runnable-track{
+  height:6px;border-radius:3px;background:var(--line);border:0;
+}
+.fit-range::-moz-range-track{height:6px;border-radius:3px;background:var(--line);border:0}
+.fit-range::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:20px;height:20px;border-radius:50%;margin-top:-7px;
+  background:var(--paper);border:2px solid var(--hc-blue);
+  box-shadow:var(--shadow-1);
+}
+.fit-range::-moz-range-thumb{
+  width:18px;height:18px;border-radius:50%;
+  background:var(--paper);border:2px solid var(--hc-blue);box-shadow:var(--shadow-1);
+}
+.fit-range:hover::-webkit-slider-thumb{border-color:var(--hc-blue-d)}
+.fit-range:hover::-moz-range-thumb{border-color:var(--hc-blue-d)}
+
+/* ── the welfare rule ────────────────────────────────────────────────────── */
+.fit-wel{
+  margin-top:20px;padding:13px 15px 14px;
+  background:var(--hc-orange-t);
+  border:1px solid var(--near-e);border-left:3px solid var(--hc-orange);
+  border-radius:8px;
+}
+.fit-wel-k{
+  font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--near);
+}
+.fit-wel-l{margin-top:8px;display:flex;flex-direction:column;gap:7px}
+.fit-wel-l li{font-size:12.5px;line-height:1.5;color:#5C4318}
+.fit-wel-l b{font-weight:700;color:#4A340F}
+.fit-wel-l b::after{content:" — "}
+.fit-wel-l span{font-weight:400}
+
+/* ── check / reset ───────────────────────────────────────────────────────── */
+.fit-check{
+  display:block;width:100%;margin-top:16px;
+  background:var(--hc-blue);color:#fff;
+  font-size:15px;font-weight:700;letter-spacing:.01em;
+  padding:14px 16px;border-radius:10px;
+  box-shadow:var(--shadow-1);
+}
+.fit-check:hover{background:var(--hc-blue-d)}
+.fit-reset{
+  display:block;width:100%;margin-top:9px;
+  font-size:12.5px;font-weight:600;color:var(--ink-3);padding:8px;
+}
+.fit-reset:hover{color:var(--hc-blue)}
+
+/* ── the marking card ────────────────────────────────────────────────────── */
+/* It covers the rail, never the dog: the student has just fitted that animal
+   and the marking reads better with the thing being marked still on screen. */
+.fit-card{
+  position:absolute;top:0;bottom:0;right:0;width:424px;z-index:20;
+  display:flex;flex-direction:column;
+  background:var(--paper);
+  border-left:1px solid var(--line);
+  box-shadow:-14px 0 40px -22px rgba(27,30,34,.4);
+}
+.fit-card[hidden]{display:none}
+.fit-card-h{
+  flex:0 0 auto;display:flex;align-items:flex-start;gap:12px;
+  padding:16px 18px 15px;
+  padding-left:max(18px,env(safe-area-inset-left));
+  border-bottom:1px solid var(--line);
+}
+.fit-card-h.is-ok{background:var(--ok-t)}
+.fit-card-h.is-near{background:var(--near-t)}
+.fit-card-h.is-no{background:var(--no-t)}
+.fit-card-ht{flex:1 1 auto;min-width:0}
+.fit-card-score{
+  font-family:var(--serif);font-weight:700;font-size:27px;line-height:1.05;
+  color:var(--ink);
+}
+.is-ok .fit-card-score{color:var(--ok)}
+.is-no .fit-card-score{color:var(--no)}
+.is-near .fit-card-score{color:var(--near)}
+.fit-card-say{font-size:13.5px;line-height:1.5;color:var(--ink-2);margin-top:4px}
+.fit-card-x{
+  flex:0 0 auto;font-size:12px;font-weight:600;color:var(--ink-2);
+  border:1px solid var(--line);background:rgba(255,255,255,.8);
+  padding:6px 12px;border-radius:999px;
+}
+.fit-card-x:hover{color:var(--hc-blue);border-color:#C9DEF2}
+
+.fit-card-b{
+  flex:1 1 auto;min-height:0;overflow-y:auto;
+  padding:4px 18px 18px;
+  padding-left:max(18px,env(safe-area-inset-left));
+  padding-right:max(18px,env(safe-area-inset-right));
+}
+.fit-row{display:flex;gap:11px;padding:15px 0;border-bottom:1px solid var(--line-soft)}
+.fit-row:last-of-type{border-bottom:0}
+.fit-row-m{
+  flex:0 0 auto;width:21px;height:21px;border-radius:50%;margin-top:2px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;font-style:normal;border:1px solid transparent;
+}
+.is-ok .fit-row-m{background:var(--ok-t);border-color:var(--ok-e);color:var(--ok)}
+.is-no .fit-row-m{background:var(--no-t);border-color:var(--no-e);color:var(--no)}
+.is-near .fit-row-m{background:var(--near-t);border-color:var(--near-e);color:var(--near)}
+.fit-row-t{flex:1 1 auto;min-width:0}
+.fit-row-k{
+  display:block;font-size:10.5px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-3);
+}
+.fit-row-was{font-size:15px;font-weight:600;line-height:1.35;color:var(--ink);margin-top:3px}
+.fit-row.is-ok .fit-row-was{color:var(--ok)}
+.fit-row.is-no .fit-row-was{color:var(--no)}
+.fit-row.is-near .fit-row-was{color:var(--near)}
+.fit-row-say{font-size:13.5px;line-height:1.6;color:var(--ink-2);margin-top:5px}
+.fit-row-cost{
+  font-size:13px;line-height:1.6;color:var(--ink-2);
+  margin-top:8px;padding:9px 11px;border-radius:7px;
+  background:var(--stage);border-left:3px solid var(--line);
+}
+.fit-row.is-no .fit-row-cost{background:var(--no-t);border-left-color:var(--no);color:#6E241E}
+.fit-row.is-near .fit-row-cost{background:var(--near-t);border-left-color:var(--hc-orange);color:#5C4318}
+.fit-row-cost b{font-weight:700;color:inherit;letter-spacing:.02em}
+
+.fit-card-w{
+  margin-top:14px;padding:12px 14px;border-radius:8px;
+  background:var(--hc-orange-t);border-left:3px solid var(--hc-orange);
+  font-size:13px;line-height:1.6;color:#5C4318;
+}
+.fit-card-w b{font-weight:700;color:#4A340F}
+
+.fit-card-f{
+  flex:0 0 auto;padding:12px 18px 16px;border-top:1px solid var(--line);
+  padding-left:max(18px,env(safe-area-inset-left));
+  padding-right:max(18px,env(safe-area-inset-right));
+}
+.fit-card-go{
+  display:block;width:100%;background:var(--hc-blue);color:#fff;
+  font-size:14.5px;font-weight:700;padding:12px;border-radius:10px;
+}
+.fit-card-go:hover{background:var(--hc-blue-d)}
+
+/* ── iPad landscape and narrower: the rail gives ground before it stacks ─── */
+@media (max-width:1180px){
+  .fit-rail{flex:0 0 372px}
+  .fit-card{width:372px}
+  .fit-h{font-size:25px}
+}
+
+/* ── stacked ─────────────────────────────────────────────────────────────── */
+@media (max-width:900px){
+  .fit{flex-direction:column}
+  /* THE RAIL IS THE DRILL; THE DOG IS THE EVIDENCE.
+     At 38vh the model took the top of a phone, the sticky section took most of
+     what was left, and a decision block scrolled to the middle of the rail
+     landed UNDERNEATH the section — measured at 414x896: 472 px of rail with
+     260 px of it already spoken for. The model gives ground first: it is still
+     large enough to turn and read the strap on, and two decisions now fit
+     between the section and the fold. */
+  .fit-3d{
+    flex:0 0 auto;height:26vh;min-height:160px;max-height:250px;
+    border-bottom:1px solid var(--line);
+  }
+  .fit-rail{flex:1 1 auto;border-left:0}
+  /* The card takes the whole pane once the rail is the whole width — a sheet
+     that covered only the lower half would put the score below the fold. */
+  .fit-card{inset:0;width:auto;border-left:0}
+  /* The section is still sticky, but it is now stuck under nothing, so it
+     needs the full-bleed treatment to stop the shadow cutting the text. */
+  .fit-sec{margin:0 -20px;padding:9px 16px 7px}
+}
+
+@media (max-width:560px){
+  .fit-rail-in{padding-left:max(15px,env(safe-area-inset-left));
+               padding-right:max(15px,env(safe-area-inset-right));
+               padding-bottom:40px}
+  .fit-sec{margin:0 -15px;padding:7px 13px 6px}
+  .fit-svg{max-width:376px}
+  .fit-cap{font-size:10.5px}
+  .fit-h{font-size:23px}
+  .fit-3d{height:23vh;min-height:150px;max-height:212px}
+  .fit-segb{font-size:12px;padding:8px 3px}
+  .fit-card-h{padding:14px 15px}
+  .fit-card-b{padding:2px 15px 16px}
+  .fit-card-score{font-size:24px}
+}
+
+/* ============================================================================
+   ▓▓ TAB 4 · FIND THE WORKING LEVEL ▓▓  (owner: LEVEL — appended, nothing
+   above this line edited or removed.)
+
+   The tab is a run, not a diagram, so the layout has exactly two jobs: keep the
+   dog big enough that a twenty-degree ear flick is legible, and keep the Nick
+   key and the level under the student's thumb at the same moment. Everything
+   below is in service of those two things holding at 1440, at 1180 and at 414.
+   ========================================================================== */
+
+:root{
+  /* Verdict colours. The palette has no green, and inventing one for this tab
+     alone would make it read as a different product — so a pass is brand blue,
+     a "nearly" is the only orange allowed to carry text, and a fail is the one
+     new hue, checked at 6.6:1 on paper. */
+  --lv-ok:var(--hc-blue-d);
+  --lv-near:var(--hc-orange-d);
+  --lv-bad:#A32B18;
+  --lv-bad-t:#FBECE8;
+  --lv-ok-t:var(--hc-blue-t);
+
+  /* Linear-space PBR values for the two physical materials the rig builds —
+     the biothane strap and the housing that stands in when receiver.glb cannot
+     be read. They live here, not in level.js, because the house rule is that a
+     colour is written down once and in the stylesheet. They are set far darker
+     than the colour you want to SEE: the scene is lit hard so a nearly black
+     dog reads at all, and a nominal 0x101010 comes back mid-grey once that
+     lighting and the gamma have been applied. */
+  --lv-strap:#040404;
+  --lv-housing:#050505;
+
+  --lv-h:min(42vh,330px);          /* stage height once the layout stacks */
+  --lv-cap-h:42px;
+}
+
+.lv{
+  height:100%;min-height:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,384px);
+  overflow:hidden;
+  background:var(--stage);
+}
+.lv[hidden]{display:none}
+
+/* ── left: the animal ──────────────────────────────────────────────────── */
+
+.lv-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.lv-stage{
+  position:relative;flex:1 1 auto;min-height:0;min-width:0;
+  background:
+    radial-gradient(120% 92% at 50% 30%,
+      #FFFFFF 0%, #F7F6F2 52%, var(--stage-edge) 100%);
+}
+
+/* The caption is the feedback loop. It sits directly under her rather than
+   across the pane in the side column, because "level 07 delivered — did she
+   tell you anything?" is a question about the thing you are looking at. */
+.lv-cap{
+  flex:0 0 auto;
+  padding:11px 22px 12px;
+  border-top:1px solid var(--line);
+  background:var(--paper);
+  font-size:13.5px;line-height:1.45;color:var(--ink-2);
+  overflow-wrap:anywhere;
+}
+.lv-cap.is-done{color:var(--hc-blue-d);font-weight:600}
+
+/* ── right: the instrument and the run ─────────────────────────────────── */
+
+.lv-side{
+  border-left:1px solid var(--line);
+  background:var(--paper);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  min-width:0;
+  display:flex;flex-direction:column;
+  padding-bottom:34px;
+}
+
+.lv-head{padding:20px 22px 16px;border-bottom:1px solid var(--line-soft)}
+.lv-k{
+  display:flex;align-items:center;gap:8px;
+  font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--ink-3);
+}
+.lv-k i{display:block;width:16px;height:2px;background:var(--hc-orange)}
+.lv-h{
+  font-family:var(--serif);font-weight:700;font-size:25px;line-height:1.12;
+  color:var(--ink);margin-top:9px;letter-spacing:-.01em;
+}
+.lv-sub{font-size:13.5px;line-height:1.55;color:var(--ink-2);margin-top:7px}
+.lv-d6{
+  margin-top:11px;font-size:12px;line-height:1.55;color:var(--ink-3);
+  border-left:2px solid var(--line);padding-left:11px;
+}
+.lv-d6 b{font-weight:700;color:var(--ink-2)}
+
+.lv-dog{
+  padding:13px 22px 14px;
+  background:var(--hc-blue-t);
+  border-bottom:1px solid #D3E4F4;
+}
+.lv-dogn{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;min-width:0}
+.lv-dogn b{font-size:16px;font-weight:700;color:var(--ink)}
+.lv-dogn span{font-size:11.5px;color:var(--hc-blue-d);min-width:0}
+.lv-state{
+  margin-top:6px;font-size:12.5px;font-weight:700;color:var(--hc-blue-d);
+  letter-spacing:.01em;
+}
+.lv-stateline{font-size:12.5px;line-height:1.5;color:var(--ink-2);margin-top:2px}
+
+/* the instrument */
+/* The instrument — and ONLY the instrument — pins. The commit row and the
+   options below it are siblings, not children, so a phone does not end up with
+   200 px of permanently pinned chrome under a 330 px picture. */
+.lv-ctl{
+  padding:16px 22px 14px;
+  background:var(--paper);z-index:4;
+  display:flex;flex-direction:column;gap:12px;min-width:0;
+}
+/* The moment the run is marked, the sheet is what the student is reading and a
+   pinned instrument over it is in the way. */
+.lv:not(.is-done) .lv-ctl{position:sticky;top:0}
+
+.lv-dialwrap{display:flex;align-items:center;gap:16px;min-width:0}
+.lv-dial{
+  width:112px;height:112px;flex:0 0 auto;
+  border-radius:50%;
+  touch-action:none;cursor:ns-resize;
+}
+.lv-dial-svg{display:block;width:100%;height:100%;overflow:visible}
+.lv-track{fill:none;stroke:var(--line);stroke-width:7;stroke-linecap:round}
+.lv-prog{fill:none;stroke:var(--hc-blue);stroke-width:7;stroke-linecap:round}
+.lv-tick{stroke:var(--ink-3);stroke-width:1.4;stroke-linecap:round;opacity:.45}
+.lv-ptr{stroke:var(--ink);stroke-width:2.6;stroke-linecap:round}
+.lv-hub{fill:var(--ink)}
+.lv-num{
+  font-family:var(--mono);font-size:30px;font-weight:700;
+  fill:var(--ink);font-variant-numeric:tabular-nums;
+}
+/* every level already sent, marked on the instrument you are turning */
+.lv-mk{stroke-width:2.6;stroke-linecap:round}
+.lv-mk-a{stroke:var(--hc-blue)}
+.lv-mk-q{stroke:var(--ink-3);opacity:.75}
+.lv-mk-x{stroke:var(--lv-bad)}
+.lv-dial:focus-visible{outline:2px solid var(--hc-blue);outline-offset:3px}
+
+.lv-steps{min-width:0;display:flex;flex-direction:column;gap:8px}
+.lv-steplbl{
+  font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);
+}
+.lv-pair{display:flex;gap:8px}
+.lv-step{
+  width:46px;height:40px;flex:0 0 auto;
+  border:1px solid var(--line);border-radius:9px;background:var(--paper);
+  font-size:19px;font-weight:600;line-height:1;color:var(--ink);
+  box-shadow:var(--shadow-1);
+}
+.lv-step:hover:not(:disabled){border-color:#C9DEF2;color:var(--hc-blue)}
+.lv-step:disabled{opacity:.4;cursor:default;box-shadow:none}
+
+.lv-nick{
+  width:100%;min-width:0;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:11px 14px 12px;border-radius:10px;
+  background:var(--hc-blue);color:#fff;
+  box-shadow:0 2px 6px rgba(28,112,185,.28);
+}
+.lv-nick b{font-size:15.5px;font-weight:700;letter-spacing:.02em}
+.lv-nick span{font-size:11.5px;opacity:.9;line-height:1.3;text-align:center}
+.lv-nick:hover:not(:disabled){background:var(--hc-blue-d)}
+.lv-nick:disabled{background:#C6CBD1;box-shadow:none;cursor:default}
+
+.lv-acts{display:flex;gap:8px;min-width:0;padding:0 22px}
+.lv-sec,.lv-go{
+  flex:1 1 0;min-width:0;
+  padding:9px 10px;border-radius:9px;
+  font-size:12.5px;font-weight:600;line-height:1.25;text-align:center;
+}
+.lv-sec{border:1px solid var(--line);color:var(--ink-2);background:var(--paper)}
+.lv-sec:hover:not(:disabled){border-color:#C9DEF2;color:var(--hc-blue)}
+.lv-go{border:1px solid var(--ink);background:var(--ink);color:#fff}
+.lv-go:hover:not(:disabled){background:#000}
+.lv-sec:disabled,.lv-go:disabled{opacity:.38;cursor:default}
+
+.lv-opts{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-top:11px;padding:0 22px 15px;min-width:0;flex-wrap:wrap;
+  border-bottom:1px solid var(--line);
+}
+.lv-hint{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-2);cursor:pointer}
+.lv-hint input{width:15px;height:15px;accent-color:var(--hc-blue);flex:0 0 auto;margin:0}
+.lv-txt{
+  font-size:12px;font-weight:600;color:var(--ink-3);
+  text-decoration:underline;text-underline-offset:2px;
+}
+.lv-txt:hover{color:var(--hc-blue)}
+
+/* ── the marking sheet ─────────────────────────────────────────────────── */
+
+.lv-res{display:none}
+.lv-res.on{display:block;padding:18px 22px 20px;border-bottom:1px solid var(--line)}
+.lv-resh{
+  display:flex;flex-direction:column;gap:4px;
+  padding:13px 15px 14px;border-radius:var(--r);
+  border:1px solid var(--line);
+}
+.lv-resh b{font-size:17px;font-weight:700;line-height:1.2}
+.lv-resh span{font-size:12.5px;color:var(--ink-2)}
+.lv-resh.good{background:var(--lv-ok-t);border-color:#C6DFF6}
+.lv-resh.good b{color:var(--hc-blue-d)}
+.lv-resh.meh{background:var(--hc-orange-t);border-color:#F0D7B9}
+.lv-resh.meh b{color:var(--lv-near)}
+.lv-resh.bad{background:var(--lv-bad-t);border-color:#F0CFC7}
+.lv-resh.bad b{color:var(--lv-bad)}
+
+.lv-prot{margin-top:16px}
+.lv-proth{
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);padding-bottom:8px;border-bottom:1px solid var(--line);
+}
+.lv-proth b{font-size:12px;letter-spacing:.04em;color:var(--ink)}
+.lv-row{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--line-soft);min-width:0}
+.lv-rowi{
+  width:20px;height:20px;flex:0 0 auto;border-radius:50%;margin-top:1px;
+  font-size:11px;font-weight:700;line-height:20px;text-align:center;font-style:normal;
+}
+.lv-row.ok  .lv-rowi{background:var(--lv-ok-t);color:var(--lv-ok)}
+.lv-row.near .lv-rowi{background:var(--hc-orange-t);color:var(--lv-near)}
+.lv-row.no  .lv-rowi{background:var(--lv-bad-t);color:var(--lv-bad)}
+.lv-rowt{min-width:0}
+.lv-rowt b{display:block;font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.3}
+.lv-rowt p{font-size:12.5px;line-height:1.58;color:var(--ink-2);margin-top:3px}
+.lv-row.no .lv-rowt b{color:var(--lv-bad)}
+
+.lv-notes{margin-top:14px}
+.lv-notes p{font-size:12.5px;line-height:1.62;color:var(--ink-2)}
+.lv-notes p + p{margin-top:9px}
+.lv-resf{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap}
+.lv-resf .lv-go{flex:0 1 auto;padding:10px 18px}
+
+/* ── what to watch for, and what this model cannot show ────────────────── */
+
+.lv-watch{padding:16px 22px 18px;border-bottom:1px solid var(--line-soft)}
+.lv-wh{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  width:100%;text-align:left;
+  font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);padding-bottom:8px;border-bottom:1px solid var(--line);
+}
+.lv-wh-i{
+  width:9px;height:9px;flex:0 0 auto;
+  border-right:1.8px solid currentColor;border-bottom:1.8px solid currentColor;
+  transform:rotate(45deg) translate(-2px,-2px);
+  transition:transform .16s ease;
+}
+.lv-watch.is-open .lv-wh-i{transform:rotate(-135deg) translate(-3px,-3px)}
+.lv-wb{display:none}
+.lv-watch.is-open .lv-wb{display:block}
+
+.lv-signs{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.lv-signs li{display:flex;gap:8px;align-items:baseline;min-width:0;flex-wrap:wrap}
+.lv-signs b{font-size:12.5px;font-weight:600;color:var(--ink)}
+.lv-signs span{font-size:12.5px;line-height:1.5;color:var(--ink-2);min-width:0}
+.lv-wp{margin-top:12px;font-size:12.5px;line-height:1.6;color:var(--ink-2)}
+.lv-wp b{font-weight:700;color:var(--ink)}
+.lv-hon{
+  margin-top:14px;padding:11px 13px;border-radius:9px;
+  background:var(--stage);border:1px solid var(--line);
+}
+.lv-src{
+  margin-top:13px;font-size:11.5px;line-height:1.55;color:var(--ink-3);
+  border-left:2px solid var(--line);padding-left:11px;
+}
+
+/* ── the run ───────────────────────────────────────────────────────────── */
+
+.lv-logbox{padding:16px 22px 0}
+.lv-lh{
+  font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);padding-bottom:8px;border-bottom:1px solid var(--line);
+}
+.lv-log{display:flex;flex-direction:column}
+.lv-e0{padding:12px 0;font-size:12.5px;color:var(--ink-3)}
+.lv-e{
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  padding:9px 0 9px 9px;border-bottom:1px solid var(--line-soft);
+  border-left:3px solid transparent;min-width:0;
+}
+.lv-e b{
+  flex:0 0 auto;font-family:var(--mono);font-size:13px;font-weight:700;
+  color:var(--ink);font-variant-numeric:tabular-nums;
+}
+.lv-e span{font-size:12.5px;line-height:1.45;color:var(--ink-2);min-width:0}
+.lv-e i{
+  font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;padding:2px 6px;border-radius:999px;flex:0 0 auto;
+}
+.lv-etag{background:var(--hc-orange-t);color:var(--lv-near)}
+.lv-erep{background:var(--stage);color:var(--ink-3)}
+.lv-e.a{border-left-color:var(--hc-blue)}
+.lv-e.a span{color:var(--ink)}
+.lv-e.c{border-left-color:var(--hc-orange)}
+.lv-e.c span{color:var(--ink)}
+.lv-e.q{border-left-color:var(--line)}
+.lv-e.n{border-left-color:var(--line);background:var(--hc-orange-t)}
+.lv-e.x{border-left-color:var(--lv-bad)}
+.lv-e.x span{color:var(--lv-bad);font-weight:600}
+
+/* ── the "tell me what happened" cue ───────────────────────────────────── */
+/* Drawn into the shell's own hotspot layer, out of the shell's own classes, so
+   a pointer on this tab is the same object as a pointer on tabs 1 and 2. */
+
+.lv-cue{
+  position:absolute;transform:translate(-50%,-50%);z-index:6;
+  pointer-events:none;white-space:nowrap;max-width:calc(100% - 20px);
+  overflow:hidden;text-overflow:ellipsis;
+  padding:5px 11px;border-radius:999px;
+  background:var(--hc-blue);color:#fff;border:2px solid #fff;
+  box-shadow:0 2px 8px rgba(43,43,43,.32);
+  font-size:12px;font-weight:600;line-height:1.25;
+}
+.lv-cue-dot{background:var(--hc-blue)}
+.lv-cue-ln{stroke:var(--hc-blue);stroke-width:2.4}
+
+/* ── iPad landscape and down: the column narrows before it stacks ──────── */
+
+@media (max-width:1180px){
+  .lv{grid-template-columns:minmax(0,1fr) minmax(0,344px)}
+  .lv-head{padding:16px 18px 14px}
+  .lv-h{font-size:22px}
+  .lv-dog,.lv-ctl,.lv-watch,.lv-logbox,.lv-acts,.lv-opts{
+    padding-left:18px;padding-right:18px}
+  .lv-res.on{padding-left:18px;padding-right:18px}
+  .lv-cap{padding-left:18px;padding-right:18px}
+  .lv-dial{width:96px;height:96px}
+}
+
+/* ── narrow: she pins to the top, the key pins under her ───────────────── */
+
+@media (max-width:859px){
+  .lv{
+    display:block;height:100%;
+    overflow-y:auto;-webkit-overflow-scrolling:touch;
+    background:var(--paper);
+  }
+  /* display:contents, so the picture and the caption become children of the
+     scroller itself. As a plain block, .lv-main was the sticky picture's
+     containing block — 372 px tall — so she unstuck and scrolled away the
+     moment the marking sheet came up, which is the exact moment a student
+     wants to look from the sheet back to the dog. It carries no role and no
+     semantics, so dissolving it costs nothing. */
+  .lv-main{display:contents}
+  .lv-stage{
+    height:var(--lv-h);
+    position:sticky;top:0;z-index:7;
+    border-bottom:1px solid var(--line);
+  }
+  /* Fixed height on purpose: the control bar sticks directly beneath it, and a
+     sticky offset cannot be computed from a box that grows a line. Two lines is
+     enough for every caption this tab writes. */
+  .lv-cap{
+    position:sticky;top:var(--lv-h);z-index:7;
+    height:var(--lv-cap-h);padding:7px 16px;
+    border-top:0;border-bottom:1px solid var(--line);
+    font-size:12px;line-height:1.35;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+  /* THE ORDER CHANGES, THE MARKUP DOES NOT. On a phone the instrument has to
+     be the first thing under the picture — in source order it sits third, and
+     leaving it there put the Nick key 340 px below the fold on a tab whose
+     entire job is "press this and watch her". Only non-interactive blocks are
+     moved past interactive ones, so the tab order still runs down the screen:
+     instrument, commit row, options, sheet, disclosure. */
+  .lv-side{
+    border-left:0;overflow:visible;padding-bottom:26px;
+    display:flex;flex-direction:column;
+  }
+  .lv-ctl{order:1}
+  .lv-acts{order:2;margin-top:12px}
+  .lv-opts{order:3}
+  .lv-dog{order:4;border-top:1px solid var(--line)}
+  .lv-res{order:5}
+  .lv-logbox{order:6}
+  .lv-head{order:7;border-top:1px solid var(--line);border-bottom:0}
+  .lv-watch{order:8;border-top:1px solid var(--line-soft)}
+
+  .lv-ctl{
+    position:sticky;top:calc(var(--lv-h) + var(--lv-cap-h));z-index:6;
+    flex-direction:row;align-items:center;gap:10px;
+    padding:10px 16px 11px;
+    background:var(--paper);border-bottom:1px solid var(--line);
+  }
+  /* Same rule as the wide layout, restated because the block above sets
+     position on .lv-ctl unconditionally: once the run is marked the sheet is
+     what is being read, and a pinned dial across the middle of it covered a
+     protocol row outright. */
+  .lv.is-done .lv-ctl{position:static}
+  .lv-dialwrap{gap:8px;flex:0 0 auto}
+  .lv-dial{width:76px;height:76px}
+  .lv-steplbl{display:none}
+  .lv-steps{flex-direction:row;gap:0}
+  .lv-pair{flex-direction:column;gap:6px}
+  .lv-step{width:38px;height:34px;font-size:17px;border-radius:8px}
+  .lv-nick{flex:1 1 auto;min-width:0;padding:10px 8px 11px}
+  .lv-nick b{font-size:14.5px}
+  .lv-nick span{font-size:10.5px}
+  .lv-acts{padding:0 16px}
+  .lv-opts{padding:0 16px 15px}
+  .lv-head{padding:16px 16px 18px}
+  .lv-dog,.lv-watch,.lv-logbox{padding-left:16px;padding-right:16px}
+  .lv-res.on{padding-left:16px;padding-right:16px}
+  .lv-h{font-size:21px}
+  /* No hover and no scroll wheel on a phone, and no room for the sentence. */
+  .lv .st-hint{display:none}
+}
+
+@media (max-width:560px){
+  .lv-head{padding-left:max(14px,env(safe-area-inset-left));
+           padding-right:max(14px,env(safe-area-inset-right))}
+  .lv-dog,.lv-watch,.lv-logbox,.lv-acts,.lv-opts{
+    padding-left:max(14px,env(safe-area-inset-left));
+    padding-right:max(14px,env(safe-area-inset-right))}
+  .lv-res.on{padding-left:max(14px,env(safe-area-inset-left));
+             padding-right:max(14px,env(safe-area-inset-right))}
+  .lv-ctl{padding-left:max(14px,env(safe-area-inset-left));
+          padding-right:max(14px,env(safe-area-inset-right))}
+  .lv-cap{padding-left:max(14px,env(safe-area-inset-left));
+          padding-right:max(14px,env(safe-area-inset-right))}
+  .lv-signs li{gap:0 8px}
+}
+
+/* Reduced motion: the shell already refuses to ease the camera, and the idle
+   breathing is switched off in level.js. The cue must not slide either. */
+@media (prefers-reduced-motion:reduce){
+  .lv-wh-i{transition:none}
+}
+
+/* ============================================================================
+   ▓▓ TAB 3 · FIT THE COLLAR — ROUND 2 ▓▓  (owner: FIT — appended, nothing
+   above this line edited or removed. Everything here is .fit-* / .fs-* and
+   overrides only this module's own earlier rules, in cascade order.)
+
+   Three things changed and all three were measured faults, not taste:
+
+   1. THE SPLIT. The tab's own copy says decision 4 cannot be seen on the dog
+      and that the section is the only place it shows — and then gave the dog
+      70% of the pane and the section 27%. The rail now takes 38% of the pane
+      between a 408 px floor and a 548 px ceiling, so at 1440 the section is
+      about 505 px wide instead of 383.
+   2. THE TYPE. Every label in the section rendered at 7.1–10.1 CSS px, which
+      is not a diagram anybody reads in a yard in the rain. Nothing is now
+      declared under 12.4 SVG units against a 400-unit viewBox, and the SVG is
+      held at or above ~392 px at every viewport — so the smallest label lands
+      at about 12.2 px on a phone and over 15 px at 1440.
+   3. THE CLIPPED WELFARE RULE. On a pass the marking card's body overflowed
+      by ~70 px with no more-below affordance, and the sentence cut in half was
+      the eight-hour rule. The paragraph has moved to the top of the body and
+      the body now carries a chip when there is more under the fold.
+   ========================================================================== */
+
+/* ── 1 · the split ───────────────────────────────────────────────────────── */
+.fit-rail{flex:0 0 clamp(408px, 38%, 548px)}
+.fit-card{width:clamp(408px, 38%, 548px)}
+.fit-svg{max-width:520px}
+
+/* ── 2 · section type. Every colour is still a class; nothing is set in JS ── */
+.fs-eye{font-size:12.4px;letter-spacing:.1em}
+.fs-scale{font-size:12.4px;font-weight:700;letter-spacing:.06em;fill:var(--ink-3)}
+.fs-clk{font-size:13px;letter-spacing:.04em}
+.fs-lensk{font-size:13px}
+.fs-band{font-size:12.6px}
+.fs-gapt{font-size:12.6px}
+.fs-chipt{font-size:13px}
+.fs-off{display:none}
+
+/* the strap ring — the picture the manual's second target never had */
+.fs-strapr{fill:none;stroke:#26292D;stroke-width:3.4;stroke-linejoin:round}
+.fs-gapm{fill:none;stroke-width:1.6;stroke:var(--ink-3)}
+.fs-gapm.is-ok{stroke:var(--ok)}
+.fs-gapm.is-no{stroke:var(--no)}
+.fs-gapl{font-size:12.4px;font-weight:700;fill:var(--ink-2)}
+.fs-gapl.is-ok{fill:var(--ok)}
+.fs-gapl.is-no{fill:var(--no)}
+/* the coat crushed under a strap pulled past two fingers */
+.fs-press{fill:none;stroke:var(--no);stroke-width:3;opacity:.75;stroke-dasharray:5 4}
+
+.fs-postl{stroke-width:6}
+.fs-skind{stroke:#C08C7C;stroke-width:1.8;fill:none}
+
+/* ── the four decisions: whose rule is whose, at the decision itself ─────── */
+.fit-src{
+  margin:6px 0 0 30px;padding-left:9px;
+  border-left:2px solid var(--line);
+  font-size:11.5px;line-height:1.45;color:var(--ink-3);
+}
+.fit-src.is-man{border-left-color:var(--hc-blue);color:var(--hc-blue-d);font-weight:600}
+.fit-q{
+  margin:9px 0 0 30px;
+  font-size:12.5px;line-height:1.5;color:var(--ink-2);
+}
+
+/* ── decision 4's option list ────────────────────────────────────────────── */
+.fit-opts{display:flex;flex-direction:column;gap:7px;margin:10px 0 0 30px}
+.fit-opt{
+  display:block;width:100%;text-align:left;
+  padding:9px 11px 10px;border-radius:9px;
+  border:1px solid var(--line);background:var(--stage);
+}
+.fit-opt:hover{border-color:#C9DEF2;background:#fff}
+.fit-opt-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.fit-opt-h b{font-size:13.5px;font-weight:700;color:var(--ink)}
+.fit-opt-s{
+  font-style:normal;font-size:10px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--ink-3);
+  border:1px solid var(--line);border-radius:999px;padding:2px 7px;
+  background:var(--paper);
+}
+.fit-opt-n{display:block;font-size:12px;line-height:1.5;color:var(--ink-2);margin-top:4px}
+.fit-opt[aria-checked="true"]{
+  border-color:var(--hc-blue);background:var(--hc-blue-t);
+  box-shadow:inset 0 0 0 1px var(--hc-blue);
+}
+.fit-opt[aria-checked="true"] .fit-opt-h b{color:var(--hc-blue-d)}
+.fit-opt[aria-checked="true"] .fit-opt-s{border-color:#B9D6EE;color:var(--hc-blue-d)}
+
+/* ── 3 · the marking card: source tags, and a more-below chip ────────────── */
+.fit-row-kh{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.fit-row-src{
+  font-style:normal;font-size:10px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3);
+  border:1px solid var(--line);border-radius:999px;padding:1px 7px;
+}
+.fit-row-src.is-man{color:var(--hc-blue-d);border-color:#C9DEF2;background:var(--hc-blue-t)}
+
+.fit-card-bw{position:relative;flex:1 1 auto;min-height:0;display:flex}
+.fit-card-bw .fit-card-b{flex:1 1 auto}
+.fit-card-more{
+  position:absolute;left:50%;bottom:9px;transform:translateX(-50%);
+  display:none;pointer-events:none;
+  font-size:11.5px;font-weight:700;letter-spacing:.04em;color:var(--ink-2);
+  background:var(--paper);border:1px solid var(--line);
+  border-radius:999px;padding:4px 12px;
+  box-shadow:0 3px 10px -3px rgba(27,30,34,.28);
+}
+.fit-card-more::after{content:" ↓"}
+.fit-card-bw.is-scrolly .fit-card-more{display:block}
+.fit-card-bw.is-scrolly::before{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:46px;
+  pointer-events:none;
+  background:linear-gradient(to bottom,rgba(253,252,250,0),var(--paper));
+}
+.fit-card-w{margin-top:0;margin-bottom:6px}
+
+/* ── iPad landscape and narrower: the rail gives ground before it stacks ─── */
+@media (max-width:1180px){
+  .fit-rail{flex:0 0 clamp(408px, 38%, 548px)}
+  .fit-card{width:clamp(408px, 38%, 548px)}
+}
+
+/* ── stacked ─────────────────────────────────────────────────────────────── */
+@media (max-width:900px){
+  .fit-rail{flex:1 1 auto}
+  .fit-card{inset:0;width:auto}
+}
+
+@media (max-width:560px){
+  /* Full bleed, because the section is the tab and 12 px of label is worth
+     more than 12 px of margin. */
+  .fit-sec{margin:0 -15px;padding:7px 7px 6px}
+  .fit-svg{max-width:400px}
+  .fit-opts{margin-left:24px}
+  .fit-src,.fit-q{margin-left:24px}
+  .fit-hid,.fit-mini,.fit-read{margin-left:24px}
+  .fit-read{padding-left:0}
+  .fit-range{width:calc(100% - 24px);margin-left:24px}
+  .fit-opt-n{font-size:11.5px}
+}
+
+/* ── TAB 3 · FIT — panel A band labels, second line (owner: FIT — appended) ──
+   Panel A owns 176 units of the 400-unit viewBox and the stack takes 108, so a
+   band label has ~60 units before the root <svg> clips it at the viewBox edge.
+   "coat · clipped" measured 83 and lost its last word — on the one coat
+   treatment that passes a January dog. The treatment now sits on its own line
+   under "coat", a step down in size so the band name still leads.            */
+.fs-band2{font-size:11.4px;font-weight:600;fill:var(--ink-3)}
+
+/* ── TAB 4 · LEVEL — the verdict's evidence and its disclosure (owner: LEVEL —
+   appended, nothing above this line edited or removed.)
+
+   The sheet now has three visibly different kinds of thing on it, and telling
+   them apart by eye is most of the fix. The account is what she DID — read off
+   the run, and formatted like the run below it so a student recognises it as
+   the same lines. The protocol rows are unchanged. The disclosure is the one
+   number the student could not see, and it is set apart: its own rule above it,
+   its own label, and a colour it does not share with the marking, so nothing in
+   it can be mistaken for something that was observed.               */
+
+.lv-acct{margin-top:16px}
+.lv-acch{
+  font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);padding-bottom:8px;border-bottom:1px solid var(--line);
+}
+.lv-accn{padding:11px 0;font-size:12.5px;line-height:1.58;color:var(--ink-2)}
+.lv-accl{display:flex;flex-direction:column}
+.lv-acce{
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0;
+  padding:8px 0 8px 9px;border-bottom:1px solid var(--line-soft);
+  border-left:3px solid var(--line);
+}
+.lv-acce b{
+  font-variant-numeric:tabular-nums;font-size:12.5px;font-weight:700;
+  color:var(--ink);flex:0 0 auto;
+}
+.lv-acce span{font-size:12.5px;line-height:1.5;color:var(--ink-2);min-width:0}
+.lv-acce.a{border-left-color:var(--hc-blue)}
+.lv-acce.c{border-left-color:var(--hc-orange)}
+.lv-acce.n{border-left-color:var(--line)}
+.lv-acce.x{border-left-color:var(--lv-bad)}
+.lv-acce.x span{color:var(--lv-bad)}
+
+.lv-reveal{
+  margin-top:18px;padding:13px 15px 14px;border-radius:var(--r);
+  border:1px solid var(--line);background:var(--stage);
+}
+.lv-revh{
+  font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);
+}
+.lv-revn{
+  margin-top:5px;font-size:11.5px;line-height:1.5;color:var(--ink-3);
+  padding-bottom:9px;border-bottom:1px solid var(--line);
+}
+.lv-revp{margin-top:9px;font-size:12.5px;line-height:1.62;color:var(--ink-2)}
+/* The grade line is CLASSED, not selected positionally: the label and the
+   honesty note above it are <p> as well, so :first-of-type picks the label. */
+.lv-revg{color:var(--ink);font-weight:600}
+.lv-reveal.good{border-color:#C6DFF6}
+.lv-reveal.good .lv-revg{color:var(--hc-blue-d)}
+.lv-reveal.meh{border-color:#F0D7B9}
+.lv-reveal.meh .lv-revg{color:var(--lv-near)}
+.lv-reveal.bad{border-color:#F0CFC7}
+.lv-reveal.bad .lv-revg{color:var(--lv-bad)}
+
+/* Provenance marks in "what a mild response looks like". The manual's own
+   words and Highland Canine's doctrine must never be mistaken for each other,
+   so they are marked per item and they do not share a colour. */
+.lv-tag{
+  flex:0 0 auto;font-style:normal;font-size:9.5px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;
+  padding:2px 6px;border-radius:999px;white-space:nowrap;
+}
+.lv-tag-m{background:var(--hc-blue-t);color:var(--hc-blue-d)}
+.lv-tag-d{background:var(--stage);color:var(--ink-3);border:1px solid var(--line)}
+.lv-wp em{font-style:italic}
+/* The "not the collar" pill takes its shape from `.lv-e i`, which is scoped to
+   the run list. The account list is a different element and needs the same
+   shape, or the tag lands as bare orange text mid-sentence. */
+.lv-acce i{
+  font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;padding:2px 6px;border-radius:999px;flex:0 0 auto;
+}
