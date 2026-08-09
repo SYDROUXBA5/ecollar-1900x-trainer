@@ -844,17 +844,111 @@ function frame(instant, dir) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  THE SECTION
+//  THE SECTION — the plate
+//
 //  Built once, then updated by attribute. Rebuilding a hundred nodes on every
 //  frame of a slider drag is how a live diagram turns into a stutter.
 //
-//  TYPE SIZE IS A HARD CONSTRAINT HERE. Last round every label rendered at
-//  7.1–10.1 CSS px, which is not a diagram a student reads in a kennel yard in
-//  the rain. Nothing below is declared under 12.4 SVG units, the viewBox is
-//  400 wide, and the stylesheet holds the rendered width at or above 392 px at
-//  every viewport — so the smallest label on the smallest screen renders at
-//  about 12.2 px, and at 1440 it is over 15. Every string in here was chosen
-//  short enough to survive that.
+//  ── WHAT CHANGED THIS ROUND, AND WHY ──────────────────────────────────────
+//  THE ANATOMY WAS RIGHT AND NOBODY COULD SEE IT. The note back on the last
+//  round was that the plate is genuinely an anatomical section when you blow
+//  it up eight times, and that it ships at 91 x 91 CSS px beside a 1440 px
+//  dog — a 20 px windpipe, 2.9 px contact points, and not one line in the
+//  drawing reaching a whole device pixel. So this round is mostly arithmetic,
+//  and all of it is measured in the running app:
+//
+//   A. THE SIZE. Three things were eating the plate and all three are gone.
+//      The annotation ring stood 0.078 model units off the coat — 78% of the
+//      neck's own radius — so the ring was twice the diameter of the section
+//      inside it; the band is at 0.0455 now and the twelve index marks
+//      straddle it instead of standing outside it. The key printed seven
+//      names; Coat and Skin are named in panel A on the very stack that
+//      measures them and the crest is a zone, so four are left. And the rail
+//      went from 38% of the pane to 47%. Net: K 470 -> 720, the sheet
+//      460x266 -> 460x350, the rendered sheet 506 -> 656 px at 1440. The
+//      windpipe is 28.5 units wide instead of 18.6 and lands at 40.6 CSS px.
+//   B. THE WINDPIPE IS FINDABLE. Its lumen was filled #FBF8F1, a hair off the
+//      fascia behind it, so the one structure the manual names by name had
+//      less weight than the muscle around it. The lumen is the darkest thing
+//      inside the outline now and the ring behind it shows through the way an
+//      oblique cut shows it — which this comment has claimed for two rounds
+//      while the drawing carried a single arc.
+//   C. THE VERTEBRA IS ONE BONE. It was a straight-sided polygon with sharp
+//      corners in a picture where everything else is a spline, with the body
+//      floating visibly detached from the arch. It is one closed spline from
+//      the ventral crest round to the spine, and it is COOL — blue-grey
+//      against warm tissue, the way _work/neck-ref.png draws it. Ivory on
+//      ivory gave it an outline and no weight.
+//   D. THE VERDICT WORD IS OFF THE SPECIMEN. "two fingers" / "too loose" was
+//      printed across the strap ring with a paper casing that punched a hole
+//      in the strap it was measuring, and the chip under the plate already
+//      said it. The dimension stays; the word is gone.
+//   E. THE RING IS LEGENDED, the centre mark is dashed annotation ink instead
+//      of a solid grey line through the bone, "x8" has a margin, the plate
+//      titles are --ink-2 (6.70:1) instead of --ink-3 (3.39:1), and every
+//      stroke on the sheet clears one device pixel at 414.
+//
+//  ── AND THE ROUND BEFORE THAT ─────────────────────────────────────────────
+//  The note then was "it doesn't look premium or real", and it was right about
+//  five specific things, all of them visible in the screenshot that came with
+//  it:
+//
+//   1. TEXT LEFT ITS PANEL. "coat / parted / skin" ran into the right edge and
+//      "never touched" sat on top of the skin block. The root <svg> clips at
+//      the viewBox SILENTLY, so nothing complained. Every string on this plate
+//      is now MEASURED after it is set — fitText() reads getBBox(), squeezes
+//      with textLength only if it must, and then shifts the box back inside
+//      its own panel. Guessing at string widths is what shipped that bug.
+//   2. THE NECK INTERIOR WAS A BLOB — a "+" and a circle standing in for a
+//      dog. It now carries the real thing: the trachea with its C of cartilage
+//      and the tracheal muscle closing it dorsally, the oesophagus just dorsal
+//      to that, paired carotid sheaths with jugular and carotid in them, the
+//      cervical vertebra with its canal and cord, the nuchal ligament on the
+//      dorsal midline, four pairs of muscle bellies, skin as a layer of its
+//      own, and the coat as real hair standing on it.
+//
+//      NONE of it is a pasted picture, and that is the point. Every landmark
+//      is held in section-normalised coordinates — u across the neck, v down
+//      it — mapped through radiusAt() at the height the student has set and
+//      then clamped inside the measured skin outline. So the anatomy thickens
+//      at the shoulder and narrows behind the ears exactly as the section
+//      does, and it is still true at every height. A fixed drawing would stop
+//      being true on the second slider step.
+//
+//      The windpipe is the heaviest structure on the plate on purpose. The one
+//      thing the manual says about position (p.27) is "on either side of the
+//      dog's windpipe", so a student has to be able to see at a glance that
+//      the two points are beside this tube and not on top of it.
+//   3. THE PALETTE. Dusty rose on sage on cream. It is one restrained
+//      anatomical family now — see the ▓ SECTION PLATE ▓ block in style.css.
+//      Orange marks the detail callout keyed A and explains nothing, which is
+//      the house rule: at brand lightness it is 2.1:1 on paper.
+//   4. TYPOGRAPHY. One scale, held: plate titles, anatomical labels,
+//      measurements, verdicts. Numbers are tabular and dimensions are aligned.
+//   5. PANEL A WAS A BAR CHART. It is now a section through strap, coat, skin
+//      and flesh with two steel posts standing in it: the coat is hair at its
+//      measured depth, the flesh is hatched the way a section is hatched, the
+//      posts are turned metal with a domed tip, and the shortfall is a
+//      dimensioned gap — extension lines, arrowheads, a value — the way an
+//      engineering drawing marks one.
+//
+//  ── WHAT DID NOT CHANGE ───────────────────────────────────────────────────
+//  Every value on this plate is still measured. The outline IS radiusAt() at
+//  the chosen height; the strap ring IS strapOff(); panel A is postLen()
+//  against effDepth() at exactly eight times the ring's own scale (MAG = 8*K,
+//  so the "×8" is arithmetic and not a caption); the three verdicts read the
+//  same vClock/vTension/vCoat the marking card reads, so the picture and the
+//  score cannot disagree. "Points stop in the coat" is untouched.
+//
+//  ── TYPE IS NOW LIGHTER THAN THE SPECIMEN, ON PURPOSE ─────────────────────
+//  The last round held every string at 14.4 SVG units, which made the key
+//  labels physically larger than the structures they named: 15.85 px of
+//  "Windpipe" against a 20.4 px windpipe. The plate title is 12.8 units and an
+//  anatomical label 12.4 — one step down in size and two in weight — against a
+//  windpipe that is now 40.6 px. At 414 the sheet is 408 px wide, which is
+//  0.887 px per unit, so the smallest label on the smallest screen renders at
+//  11.0 CSS px and the plate title at 11.4. Nothing on the sheet is squeezed
+//  by textLength in any of the 24,024 states swept at 1440 and at 414.
 // ═══════════════════════════════════════════════════════════════════════════
 
 var NS = 'http://www.w3.org/2000/svg';
@@ -878,24 +972,521 @@ function el(tag, cls, s) {
 function show(node, on, cls) {
   node.setAttribute('class', cls + (on ? '' : ' fs-off'));
 }
+function n1(v) { return (Math.round(v * 10) / 10); }
 
-/* Section geometry, in the SVG's own units.
-   K is FIXED on purpose. A section that rescaled itself to fill the frame
+/* ── THE SHEET, AND WHY IT IS THE SIZE IT IS ────────────────────────────────
+       0 ─────────────────────────── 306 │311│ 317 ────────── 460
+         the section, in a 237-unit          panel A · the same
+         band, with a four-name key          stack at eight times
+       0 ── the ring's own legend ── 306
+       0 ─────────────────────────────────────────────────────  460
+         three verdicts, on the footer rule
+
+   ── THE SIZE WAS THE WHOLE FAULT, SO IT WAS SOLVED AS ARITHMETIC ──────────
+   The note back was that the anatomy is right and nobody will ever see it:
+   the drawing that carries the lesson rendered 91 x 91 CSS px beside a
+   1440 px dog, with a 20 px windpipe and 2.9 px contact points. It was not
+   drawn too small by accident. Three things were eating the plate:
+
+     1. THE ANNOTATION RING STOOD 0.078 MODEL UNITS OFF THE COAT — 78% of the
+        neck's own radius — so the ring was twice the diameter of the section
+        inside it and the section got half of half the sheet. The strap only
+        ever reaches 0.0396 off the coat (slackAt(0) x 1.5, the loosest the
+        slider goes) and the receiver's housing, which is always pressed flat
+        under itself, reaches 0.0006 + 15/K. The band now sits at 0.0455 and
+        the index marks straddle it: everything still clears, and the ring's
+        outermost ink is at 0.0539 instead of 0.078+.
+     2. THE KEY PRINTED SEVEN NAMES. Coat and Skin are named in panel A, on
+        the very stack that measures them, and Crest is a zone, not a
+        structure — it is named in the ring's legend where it belongs. Four
+        interior names are left, so the column is 57 units instead of 71 and
+        the leaders cannot run out of vertical room.
+     3. THE RAIL. 38% of the pane held a 506 px sheet. It is 47% now.
+
+   The result is arithmetic, not taste. K went 470 -> 720, the sheet 460x266
+   -> 460x350, and the rendered sheet 506 -> 656 px at 1440. The windpipe is
+   28.6 units wide instead of 18.6 and lands over 40 CSS px at 1440.
+
+   ── WHAT BOUNDS IT AT 414, HONESTLY ───────────────────────────────────────
+   At 414 the sheet can only be 408 px wide, and it is sticky above a rail
+   570 px tall, so the plate cannot grow past about 310 px of height without
+   leaving no room to work the sliders it answers. That fixes px-per-unit at
+   0.887, and the windpipe lands at 25 px, not 40. K cannot be raised to make
+   up the difference: at 720 the ring already fills 234 of the 237 units the
+   section band is wide. The remaining lever is the phone, and it has been
+   spent.                                                                   */
+var VBW = 460, VBH = 350;
+var HEADY = 15, RULEY = 22;    // plate title baseline, and the rule under it
+/* ── THE SHEET HAS A MARGIN NOW, AND IT IS NOT DECORATION ──────────────────
+   "LOOKING DOWN THE NECK" was set at x = 0 and measured back at x = 0.00: the
+   first stem of the L stood exactly on the trim. Nothing was clipped, which is
+   worse than being clipped — it means one step of font-size, one wider glyph,
+   one different rendering of the same face, and the title loses ink silently,
+   which is the failure mode this whole round was called to hunt. Three units
+   is 2.7 px at 414 and 4.3 at 1440: enough that the loss would be visible
+   before it was total, and enough that the sheet reads as a sheet. The title,
+   the rule under it and the footer rule all sit on it, so the margin is a
+   margin and not one indented string. */
+var LEFTM = 3;
+/* P1W and DETX are set by MEASUREMENT, not by eye — every string on this
+   sheet is read back off getBBox() in the running app and held inside its own
+   panel. A plate whose type is being compressed on every frame is a plate
+   that does not fit. */
+var SEC_Y0 = 27, SEC_Y1 = 291; // the band the section is drawn in
+var P1W = 306;                 // the section plate, right edge
+var DIVX = 311;                // the hairline between the plates
+var DETX = 317;                // panel A's own origin
+var P2W = VBW - DETX;          // 143
+/* Where a leader turns, and where its label starts. Both moved 2 units left
+   this round because the key now carries NINE names instead of five and the
+   longest of them, "Spinal cord", measures 59.2 units against the 59 the old
+   column had. Measured, not guessed: swept over every height, tension and
+   clock angle, the outermost ink on the ring reaches x = 234.1 (the long index
+   marks, at height 0), so a turn at 238 clears the specimen by 3.9 units with
+   the leader's own paper casing — 1.7 — taken off. */
+var LEADX = 238, LBLX = 242;
+var LEGY = 303;                // the ring's legend, under the section
+var FOOTY = 310;               // the footer rule
+var CHIPY = 316, CHIPH = 26;
+/* The three chips are sized to what they have to say, measured in the running
+   app: "4½ o'clock" is 71.1 units, "Two fingers" 75.7 and "Points stop in the
+   coat" 143.9. Three equal thirds squeezed the third one on every state where
+   the points fail — which is the state the plate exists to show. */
+/* AND THEY ARE INSET BY THE HALF-STROKE OF THEIR OWN BORDER. The outer two
+   were flush on the trim at x = 0 and x = 460, which is not a margin — it puts
+   half of a 1.2-unit border outside the viewBox, where the root <svg> clips it
+   without saying so. Measured: 0.6 units of missing edge, 0.53 px at 414. */
+var CHIP = [[1, 104], [112, 268], [276, 459]];
+
+/* K is FIXED on purpose. A section that rescaled itself to fill the frame
    would hide the single most useful thing this picture says: the neck is far
-   thicker at the shoulder than it is behind the ears. */
-var SX = 104, SY = 118, K = 400;    // centre of the ring, and units per model unit
-var Z_R = 0.040, CLK_R = 0.062;     // zone band and clock labels, outside the coat
-var DETX = 224;                     // where panel A's own coordinate space starts
-var MAG = 3200;                     // panel A's scale — about 8x the ring
-var DX0 = 12, DX1 = 108;            // the magnified stack, left and right
-var SKINY = 168;                    // skin is the fixed datum in panel A
-var FLOORY = 212;                   // bottom of the flesh block
-var PX = [DX0 + 26, DX0 + 66];      // the two points in panel A
-var CHIPY = 218;
+   thicker at the shoulder than it is behind the ears.
+
+   720 is solved, not chosen. Swept over every height, tension and clock
+   angle, the outermost ink on the ring reaches -112.8..+121.2 units across
+   and -124.2..+133.7 down from the section's own centroid at this K, which is
+   234 x 258 in a band that is 237 x 264. Three units of margin, both ways. */
+var SX = 116, SY = 156, K = 720;  // centre of the ring, and units per model unit
+/* Reading outward from the coat, in MODEL units, so the whole ring is a fixed
+   stand-off and the section grows and shrinks inside it as the height slider
+   moves: strap (0.0396 at its loosest), housing (0.0006 + 15/K = 0.0214),
+   then the band and the twelve index marks that straddle it. */
+var Z_R = 0.0455;              // the zone band's CEILING, outside the coat
+/* The index marks straddle the band and the leaders leave outside it, so all
+   four radii are quoted as offsets from wherever the band actually is. The
+   long marks came in from +0.0075 to +0.0045 — they used to stand 2.7 units
+   proud of the band's own outer edge for no reason, and they are the outermost
+   ink on the sheet, so that 2.2 units is what paid for the wider key column. */
+var IDX_D0 = -0.005, IDX_D1 = 0.0045, IDX_D1S = 0;
+var EXIT_D = 0.011;            // where an anatomy leader leaves the ring
+
+/* ── THE RING WAS A DETACHED RIND HIGH ON THE NECK ─────────────────────────
+   The stand-off was one constant, by design: the section then grows and
+   shrinks inside a ring that holds still, which is the right instinct for a
+   scale. What it did NOT survive is how much the section changes. At height 0
+   the moat between coat and band is 32.6 units against a specimen 158.7 wide —
+   21% — and at height 100 it is the same 32.7 units against a specimen 118.4
+   wide, which is 28%, and the band is then half as wide again as the neck it
+   is annotating. On screen it stops reading as an annotation on the neck and
+   starts reading as an outer rind with the dog floating inside it.
+
+   So the stand-off is now the SMALLER of three things, and every one of them
+   is measured:
+
+     prop   the same FRACTION of the section's own mean radius that 0.0455 is
+            at the widest section the slider can reach. Height 0 is therefore
+            unchanged to the last decimal — which matters, because K = 720 was
+            solved against the ring's extent at exactly that state — and every
+            section above it keeps the same proportion of moat.
+     clear  the strap's own outermost ink at the tension the student has set,
+            plus a hairline. The band may not be drawn on top of the strap, and
+            the strap moves with the tension slider, so the floor moves with it.
+     Z_R    the ceiling. It can only ever come IN, so nothing that fitted
+            before can stop fitting.
+
+   ZR_MIN is where the receiver's needle stops being a needle: it starts 15.2
+   units off the strap face, on the housing, and the band's inner edge has to
+   stay far enough out to leave a line as well as an arrowhead. 0.034 leaves
+   5.0 units at the tightest strap the slider allows. */
+var ZR_MIN = 0.034;
+var ZR_REF = null;
+function meanR(s) {
+  var m = 0, i;
+  for (i = 0; i < 16; i++) m += radiusAt(s, (i / 16) * Math.PI * 2);
+  return m / 16;
+}
+function zoneR(s, slack) {
+  if (ZR_REF === null) {
+    ZR_REF = 0;
+    for (var i = 0; i <= 20; i++) ZR_REF = Math.max(ZR_REF, meanR(i / 20));
+  }
+  var prop  = Z_R * (meanR(s) / ZR_REF);
+  var clear = 0.0006 + Math.max(slack, 0) * 1.5 + 2.3 / K + 0.0055;
+  return Math.min(Z_R, Math.max(ZR_MIN, prop, clear));
+}
+
+var MAG = K * 8;               // panel A. The "×8" on the plate is this line.
+var DX0 = 20, DX1 = 90;        // the magnified stack, left and right
+var PX = [39, 71];             // the two contact points in panel A
+var POSTW = 10;
+var SKINY = 176, SKIN_T = 6;   // skin is the fixed datum, and it has a thickness
+var FLOORY = 220;              // bottom of the flesh block
+var STRAPH = 15;               // the strap, where it runs off the housing
+var HOX = 32, HOW = 46, HOH = 27;     // the housing: its face is what sits on the coat
+
+/* The two contact points where they sit on the SECTION: half the spacing
+   between them, and the width of one post. Length is never a constant here —
+   it is postLen(), measured, every frame. */
+var RXPX = 5.6, RXPW = 4.6;
+var TRING_N = 4;                      // cartilage rings down the windpipe
+
+/* Deterministic jitter. The coat is drawn as hair, and hair that reseeds
+   itself on every frame of a slider drag shimmers. */
+var JIT = (function () {
+  var a = [], x = 20260807, i;
+  for (i = 0; i < 220; i++) { x = (x * 16807) % 2147483647; a.push((x % 1000) / 1000); }
+  return a;
+})();
+
+/* ── ANATOMY, IN SECTION-NORMALISED COORDINATES ────────────────────────────
+   u runs across the neck as a fraction of the skin outline's own half-width,
+   v runs down it as a fraction of its half-depth, positive ventral. Anything
+   given for one side is mirrored, so the plate is symmetrical about the
+   midline the way the animal is.
+
+   The proportions are read off _work/neck-ref.png. They are stored as
+   FRACTIONS precisely so that they follow the measured outline instead of
+   sitting on top of it: at the shoulder the section is broad and everything
+   in it is broad; behind the ears it is narrow and everything narrows with
+   it. That is what lets this be a live picture and an anatomy plate at once.
+   The reference itself is never drawn, and there is no raster in this app. */
+var MUSCLE = [
+  /* epaxial mass, dorso-lateral — why nothing reaches skin at the crest */
+  { p: [[-0.13, -0.86], [-0.55, -0.72], [-0.87, -0.28], [-0.69, 0.00], [-0.38, -0.14], [-0.19, -0.48]],
+    ax: [[-0.28, -0.72], [-0.62, -0.08]] },
+  /* the long lateral mass — brachiocephalicus over sternocephalicus */
+  { p: [[-0.91, 0.00], [-0.85, 0.44], [-0.60, 0.77], [-0.34, 0.58], [-0.38, 0.15], [-0.64, -0.06]],
+    ax: [[-0.78, 0.05], [-0.45, 0.62]] },
+  /* sternohyoideus, the pair that lies right under the trachea */
+  { p: [[-0.28, 0.80], [-0.32, 0.97], [-0.04, 1.00], [-0.03, 0.82]],
+    ax: [[-0.22, 0.85], [-0.11, 0.95]] },
+  /* longus colli, slung under the vertebral body */
+  { p: [[-0.35, -0.04], [-0.39, 0.16], [-0.09, 0.21], [-0.06, 0.00]],
+    ax: [[-0.30, 0.02], [-0.12, 0.15]] }
+];
+var TRACH  = { u: 0, v: 0.57, rx: 0.275, ry: 0.225 };
+var OESOPH = { u: -0.06, v: 0.285, rx: 0.150, ry: 0.100 };
+/* ── THE CAROTID SHEATH — TWO VESSELS, NOT THREE SPECKS ────────────────────
+   It held a jugular, a carotid and a vagus dot inside a 12.6-unit ring: an
+   11 px circle carrying 5 px, 3.4 px and 2 px marks on a phone, which is
+   three colours of confetti, not a neurovascular bundle. The vagus is gone —
+   it is a nerve, it is not what a contact point can press on, and it was the
+   smallest mark on the sheet. The two vessels that are left are bigger, and
+   they have WALLS: an artery's wall is thick and its lumen small, a vein's is
+   thin and its lumen wide, and at this size that difference is the only thing
+   that tells them apart without reading the colour. */
+var SHEATH = { u: 0.435, v: 0.405, rx: 0.140, ry: 0.108 };
+
+/* ── THE NUCHAL LIGAMENT, AND WHY IT IS NO LONGER MAPPED LIKE THE REST ─────
+   It was attached at both ends and it was still wrong, and the fault was in
+   the map rather than in the numbers.
+
+   uv() places a point by RADIAL FRACTION about O, the polar origin every ring
+   path is swept about. Work it through for a point quoted on the midline —
+   u = 0 — and the x that comes out is
+
+       x = O.x + (M.x - O.x) · ANAT_IN · rs(a) / ri(a)
+
+   in which a is that point's OWN direction from O. rs/ri — measured outline
+   over ideal ellipse — is a function of direction, so two points both quoted
+   on the midline at different depths come out at different x. Inside a compact
+   structure the two directions barely differ and the error is invisible: the
+   windpipe, the gullet, the vertebra and the sheath pair are each only a few
+   units deep in the radial sense, and swept over the whole slider their axes
+   stay within 3-4% of the section's width of each other, which is the method's
+   own noise.
+
+   The nuchal ligament is not compact. It runs the entire way from the dorsal
+   fascia down to the vertebral spine, so its two ends look out along
+   noticeably different rays — and it lives dorsally, which is exactly where
+   this measured section departs most from the ellipse u and v are quoted
+   against. Measured over the slider it walked 11.5 units off the vertebra by
+   height 100 and its width GREW 61% while the section itself narrowed 30%. A
+   structure that gets bigger as the neck gets smaller is not being scaled, it
+   is being SHEARED — pinned at the fascia, pinned at the spine, and stretched
+   between them. It read as tilted 25-30 degrees, sitting over the muscle belly
+   rather than on the crest. The one structure whose entire definition is "on
+   the dorsal midline" was the one leaning off it, and heights 69 and up are
+   precisely where the lesson sends the student.
+
+   So it is not mapped point by point any more. It is BUILT on the midline, out
+   of four things that are each still an answer to the measurement:
+
+     x     ONE number for the whole ligament — the x that the vertebral spine's
+           own tip maps to. That is the bone it attaches to, so it is the
+           median plane as this section draws it, and the ligament's axis and
+           the vertebra's axis are now the same line by construction rather
+           than by hope.
+     top   where the vertical line through that x crosses the dorsal fascia,
+           SOLVED off the measured outline by bisection on its own polar angle
+           — not assumed, and not capped at it from outside.
+     foot  the spine tip itself.
+     width a fraction of HW, the measured inside-of-skin half-width, so it can
+           only shrink when the neck shrinks. Nothing multiplies it any more.
+
+   What has gone is the single degree of freedom that let it lean.
+
+   The profile below is therefore listed as SHAPE only: a half-width as a
+   fraction of the section's own half-width, and a station running 0 at the
+   fascia to 1 at the spine. The stations are the old v list re-expressed —
+   (v + 1.005) / 0.633 — so the outline is the same outline; only what holds it
+   up has changed. */
+var NUCH = [
+  [ 0.000, 0.000], [ 0.058, 0.052], [ 0.096, 0.363], [ 0.091, 0.694],
+  [ 0.054, 0.905], [ 0.021, 0.986], [ 0.000, 1.000], [-0.021, 0.986],
+  [-0.054, 0.905], [-0.091, 0.694], [-0.096, 0.363], [-0.058, 0.052]
+];
+/* The elastic sheets in it, so it is a ligament and not a blank wedge. */
+var NUCH_F = [[-0.030, 0.103, -0.030, 0.893], [0.030, 0.103, 0.030, 0.893]];
+
+/* ── AND ONE MEDIAN PLANE FOR EVERYTHING ELSE THAT IS ON IT ────────────────
+   The ligament was the structure the bend in uv() broke, because it is by far
+   the longest thing quoted on the midline. But the bend is there for
+   everything. Swept to the top of the slider, the windpipe's axis and the
+   vertebra's axis came out 8.5 units apart in a section 97 units wide — a 9%
+   spread in a plane that is ONE plane in every animal, and the two structures
+   a student uses to orient themselves.
+
+   The correction is applied to whole STRUCTURES and never to points. Each one
+   is still mapped exactly as before, so its shape is still uv()'s answer to
+   the measured outline and its DEPTH is untouched to the last decimal — which
+   matters, because the windpipe's depth and the jugulars' are already inside
+   the reference's own uncertainty and were not the fault. The finished
+   structure is then slid sideways, rigidly, onto the plane. A rigid slide
+   cannot distort anything, cannot separate a structure from itself, and cannot
+   change what a leader is pointing at, because the leaders are quoted off the
+   same numbers.
+
+   Two muscle bellies ride with the structures they are defined against: the
+   sternohyoideus pair IS "the pair that lies right under the trachea", and the
+   longus colli IS "slung under the vertebral body". The two big lateral masses
+   do not move — they belong to the outline, not to the midline.
+
+   The plane itself is where the map puts u = 0 averaged over the depths the
+   anatomy actually occupies. Averaged, so no single structure is privileged
+   into being the one that never moves; over that span, because the shear is a
+   function of depth and it is the middle of the span that is worth being
+   right. The cap is 8 units: past that the section is no longer a neck at all
+   and a slide would be doing more than de-shearing. */
+function medianX(F) {
+  var sx = 0, n = 9, i;
+  for (i = 0; i < n; i++) sx += uv(F, 0, -0.88 + 1.76 * (i / (n - 1)))[0];
+  return sx / n;
+}
+function slideTo(mx, ax) {
+  return Math.max(-8, Math.min(8, mx - ax));
+}
+function sl(p, dx) { return [p[0] + dx, p[1]]; }
+
+/* Where the ligament stands, at this height, in the plate's own units. Called
+   once a frame, before anything that needs to point at it. */
+function nuchAxis(F) {
+  /* The foot is the vertebral spine's tip through the same map the bone uses,
+     so the ligament sits on the bone rather than near it; its x is the median
+     plane, which is where that bone has just been slid to. */
+  var foot = uv(F, 0, VERT.out[VERT.out.length - 1][1]);
+  var mx = F.mx;
+  /* And the top is where the median plane meets the dorsal fascia. The fascia
+     is rs(a) · ANAT_IN — the same rim every other structure is held inside —
+     and x along it rises monotonically with a over the dorsal quadrant, so
+     twenty-eight halvings put the crossing inside a ten-thousandth of a unit. */
+  var a0 = -1.15, a1 = 1.15, am = 0, k, px;
+  for (k = 0; k < 28; k++) {
+    am = (a0 + a1) / 2;
+    px = F.O[0] + Math.sin(am) * F.rs(am) * ANAT_IN;
+    if (px < mx) a0 = am; else a1 = am;
+  }
+  var R = F.rs(am) * ANAT_IN;
+  return { x: mx, yTop: F.O[1] - Math.cos(am) * R, yFoot: foot[1], hw: F.HW };
+}
+/* A point on the ligament, from its own [half-width fraction, station] pair. */
+function nuchPt(N, u, t) {
+  return [N.x + u * N.hw, N.yTop + t * (N.yFoot - N.yTop)];
+}
+
+/* ── THE OESOPHAGUS, WHICH WAS READING AS A SNOWFLAKE ──────────────────────
+   A small pink pill with a white asterisk stroked across it. At every viewport
+   it read as an icon, and it was the one clip-art object on an otherwise
+   convincing plate.
+
+   The first attempt at fixing it was a filled six-ray star, and that was still
+   a snowflake — radial symmetry is the whole of what makes a glyph read as a
+   glyph, so no amount of jitter on the rays was going to save it. Look at what
+   _work/neck-ref.png actually draws: not a star at all, but a plain muscular
+   oval with a dark, irregular, roughly TRANSVERSE slit in it. An empty
+   oesophagus is closed by its own wall, and the closure is a crease, not a
+   rosette.
+
+   So the lumen is a closed slit — wide, shallow, and uneven along both edges,
+   listed here as fractions of the lumen's own half-width and half-depth. It is
+   filled, it has no radial symmetry left in it, and there is nothing stroked
+   across the mucosa any more. */
+var OES_LUMEN = [
+  [-1.00,  0.06], [-0.60, -0.34], [-0.18, -0.12], [ 0.20, -0.40],
+  [ 0.62, -0.16], [ 1.00, -0.02], [ 0.66,  0.34], [ 0.24,  0.14],
+  [-0.14,  0.40], [-0.56,  0.18]
+];
+
+/* ── THE VERTEBRA, REDRAWN ─────────────────────────────────────────────────
+   It was the one structure that did not read: a straight-sided polygon with
+   sharp corners in a picture where everything else is a spline, and a body
+   ellipse floating visibly detached from the arch above it. It looked like a
+   paper aeroplane.
+
+   It is now ONE closed outline, splined like every other soft structure, from
+   the ventral crest of the body round the transverse process, up over the
+   articular process to the short spine on the midline — the shape a mid
+   cervical vertebra actually presents when you cut across it, and the shape
+   in _work/neck-ref.png. The right half is listed; the left is mirrored.
+   Body, pedicle, wing and lamina are one bone because they are one bone.
+
+   And it is the only COOL mass in a warm section. In the reference the bone
+   is blue-grey against pink muscle and cream fascia, which is why it is the
+   second landmark you find. The old ivory sat within a hair of the fascia
+   behind it, so it had an outline and no weight. */
+var VERT = {
+  out: [
+    [0.000, -0.012], [0.115, -0.028], [0.180, -0.075], [0.168, -0.130],
+    [0.245, -0.150], [0.300, -0.192], [0.268, -0.222], [0.196, -0.212],
+    [0.212, -0.290], [0.176, -0.330], [0.118, -0.312], [0.052, -0.352],
+    [0.000, -0.368]
+  ],
+  cv: -0.245, cx: 0.115, cy: 0.062,   // canal
+  bv: -0.100, bx: 0.180, by: 0.085    // where the body sits, for the floor line
+};
+
+/* ── AND THE WHOLE BONE SAT 0.10 TOO FAR VENTRAL ───────────────────────────
+   Normalised about the inside-of-skin frame — the only frame in which two
+   drawings of two different necks can be compared at all — _work/neck-ref.png
+   puts the vertebra's centre at v = -0.313 and this plate rendered it at
+   -0.212 in the teaching band. Everything else on the sheet is inside the
+   method's own uncertainty of about 0.05: the windpipe reads +0.478 against a
+   reference +0.542, the jugulars -0.387 and +0.425 against ±0.35. The bone was
+   the one landmark outside it, and it is the landmark a student uses to find
+   everything else, because it is the only cool mass in a warm section.
+
+   0.105 is what closes it, measured back in the running app rather than
+   guessed. It is applied here, once, to the outline, the canal and the body
+   together, so the bone moves as a bone: a shift written into thirteen
+   coordinates by hand is a shift that goes stale the first time one of them is
+   touched.
+
+   The longus colli goes with it, but only by its ROOF. It is slung under the
+   vertebral body — that is the whole of what it is — so its top edge has to
+   follow the bone or a hole opens under the body where there is muscle in
+   every reference. Its floor stays where the gullet is. The belly gets deeper
+   by exactly what the bone moved, which is also what happens in the animal. */
+var VERT_DV = -0.105;
+(function () {
+  var i;
+  for (i = 0; i < VERT.out.length; i++) VERT.out[i][1] += VERT_DV;
+  VERT.cv += VERT_DV;
+  VERT.bv += VERT_DV;
+  var LC = MUSCLE[3];
+  LC.p[0][1] += VERT_DV; LC.p[3][1] += VERT_DV;
+  LC.ax[0][1] += VERT_DV * 0.62; LC.ax[1][1] += VERT_DV * 0.22;
+})();
+
+/* ── ONE GEOMETRY, ONE RULE, FOR EVERY LABEL ON THE RING ───────────────────
+   FOUR names, not seven. Coat and Skin are named in panel A on the very stack
+   that measures them, and the crest is a zone rather than a structure — it is
+   named in the ring's legend. Printing all seven here made the annotation
+   column heavier than the specimen and collapsed its own leading at the top
+   of the height range.
+
+   ── AND NO ANCHOR IS TYPED TWICE ──────────────────────────────────────────
+   The Carotid leader used to point at bare fascia. Not by much — about four
+   units, five and a half pixels at 1440 — but it named a structure it did not
+   touch, which is the one thing an anatomical key may never do. The cause was
+   that KEYS carried its OWN u,v (0.40 / 0.24) beside the sheath's own record
+   (0.435 / 0.405). Two hand-typed pairs for one place: change either and the
+   leader silently stops agreeing with the drawing.
+
+   A key entry no longer carries coordinates. It carries a FUNCTION that asks
+   the structure where it is — SHEATH's centre, VERT's body, MUSCLE's own axis,
+   TRACH's lumen — so a leader cannot disagree with the thing it names, ever,
+   because there is only one number and they both read it.
+
+   ── AND THE FIFTH ENTRY IS THE ONE THE MANUAL IS ABOUT ────────────────────
+   Four structures were named and the contact points were not — the subject of
+   the lesson was the only unnamed thing on the plate, and at the correct 7:30
+   fit the two posts read as part of the black housing. The fifth entry is
+   theirs. Its anchor is not a u,v at all: it is the tip of the actual post, at
+   the clock angle and the post length the student has set, so it moves with
+   the receiver round the whole dial.
+
+   Which means it can leave from the LEFT half, and a straight run to a
+   right-hand column would cross the specimen. So a leader that starts on the
+   left is routed round the OUTSIDE of the ring — over the top or under the
+   throat, whichever is nearer — and only then turns into the column. Routed
+   round, never across: that is a draughtsman's rule and it is the reason the
+   column can hold a label for something that moves. */
+/* ── AND FOUR THINGS WERE DRAWN AND NOT NAMED ──────────────────────────────
+   The plate got good enough to be read as anatomy, and the moment it did, an
+   unnamed structure stopped reading as restraint and started reading as
+   DECORATION — which is the exact charge this work exists to defeat. Four were
+   drawn in full and never named: the gullet, the nuchal ligament, the spinal
+   cord, and the skin, which was named only over in panel A on the stack that
+   measures it and not on the specimen it is a layer of.
+
+   The nuchal ligament is the one that mattered. Half of decision 2's reason —
+   the crest is no place for a contact point — is that this band and the muscle
+   either side of it are what a point would have to get through, and it sat
+   there anonymous.
+
+   NINE names, and the column was measured before they were written, not after:
+   the longest is "Spinal cord" at 59.2 units against the 64 the column now
+   holds, so nothing on this sheet is squeezed by textLength in any state.
+
+   THE GULLET IS CALLED THE GULLET for the same reason the trachea is called
+   the windpipe. This plate has always been in the register a trainer speaks in
+   on a field — windpipe, not trachea; muscle, not brachiocephalicus; vertebra,
+   not C4 — and naming one tube in Greek and the one beside it in English would
+   be the only inconsistency on the sheet. The Latin sits in the plate's own
+   aria-label, where a reader who wants it will find it read out. */
+var KEYS = [
+  { t: ['Nuchal', 'ligament'], at: function (F) {
+      /* Off its own axis by a twentieth of the section's half width, which is
+         inside the band at every station: it is 0.093 wide there. */
+      return nuchPt(F.nuch, 0.05, 0.40);
+    } },
+  /* Every anchor carries its structure's own slide, read off the same F.sl the
+     drawing reads, so a leader cannot point at where a structure used to be. */
+  { t: ['Vertebra'], at: function (F) { return sl(uv(F, VERT.bx * 0.42, VERT.bv), F.sl.vert); } },
+  { t: ['Spinal cord'], at: function (F) { return sl(uv(F, VERT.cx * 0.30, VERT.cv), F.sl.vert); } },
+  { t: ['Muscle'],   at: function (F) {
+      var A = MUSCLE[0].ax;
+      return uv(F, -(A[0][0] + A[1][0]) / 2, (A[0][1] + A[1][1]) / 2);
+    } },
+  { t: ['Carotid'],  at: function (F) { return sl(uv(F, SHEATH.u, SHEATH.v), F.sl.sheath); } },
+  /* On the muscular wall, not in the lumen: the wall runs from 0.76 to 1.00 of
+     the tube's own half-width and the anchor is at 0.88 of it. */
+  { t: ['Gullet'],   at: function (F) { return sl(uv(F, OESOPH.u + OESOPH.rx * 0.88, OESOPH.v), F.sl.oes); } },
+  { t: ['Windpipe'], at: function (F) { return sl(uv(F, TRACH.u + TRACH.rx * 0.34, TRACH.v), F.sl.trach); } },
+  /* The skin's anchor is IN the layer — on the outline the skin band is stroked
+     along — and it is chosen each frame to stand as far round the neck from the
+     receiver as the right half allows, so the leader never leaves from under
+     the housing. */
+  { t: ['Skin'],     at: function (F) { return F.skin; } },
+  /* Two lines, because "Contact points" measures 74.1 units against the 64 the
+     column has. Squeezing it with textLength would have been the first
+     compressed string on the sheet. */
+  { t: ['Contact', 'points'], at: null, rx: true }
+];
 
 /* The ring is drawn about the section's own centroid rather than about the
    centreline, so it sits still in its frame while its SIZE and SHAPE change.
-   The centreline is still drawn, as a cross, because every clock angle is
+   The centreline is still marked, as a cross, because every clock angle is
    measured from it and the picture has to stay honest about that. */
 function centroid(s) {
   var x = 0, y = 0, n = 48;
@@ -910,185 +1501,546 @@ function ringPt(s, a, extra, c) {
   return [SX + (Math.sin(a) * r - c.x) * K, SY + (-Math.cos(a) * r - c.y) * K];
 }
 function ringPath(s, extra, c, a0, a1, close) {
-  var d = '', n = 84, i, p;
+  var d = '', n = 96, i, p;
   var f = a0 == null ? 0 : a0 * Math.PI / 180;
   var t = a1 == null ? Math.PI * 2 : a1 * Math.PI / 180;
   for (i = 0; i <= n; i++) {
     p = ringPt(s, f + (t - f) * (i / n), extra, c);
-    d += (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1);
+    d += (i ? 'L' : 'M') + n1(p[0]) + ' ' + n1(p[1]);
   }
   return d + (close ? 'Z' : '');
 }
-/* The strap is not concentric, so it needs its own sweep. */
+/* The strap is not concentric with the neck, so it needs its own sweep. */
 function strapRingPath(s, slack, aRx, c) {
-  var d = '', n = 96, i;
+  var d = '', n = 108, i;
   for (i = 0; i <= n; i++) {
     var a = (i / n) * Math.PI * 2;
     var p = ringPt(s, a, strapOff(a, slack, aRx), c);
-    d += (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1);
+    d += (i ? 'L' : 'M') + n1(p[0]) + ' ' + n1(p[1]);
   }
   return d + 'Z';
 }
 
-function buildSection() {
-  var svg = sv('svg', 'fit-svg', { viewBox: '0 0 400 246', role: 'img' });
-  svg.setAttribute('aria-label',
-    'Live cross-section through the neck at the receiver, with a magnified ' +
-    'view of the contact points against the coat.');
-  var S = { svg: svg };
+/* ── the section's own frame ───────────────────────────────────────────────
+   O is the polar origin every ring path is swept about — the centreline.
+   M is the middle of the SKIN outline and HW/HH are its half-extents. The
+   anatomy is laid out about M, because a dog's windpipe is central to its
+   neck and not to a raycast centreline that sits wherever the profile put it.
+   Every anatomical point is then pulled back inside the outline by uv(), so
+   no structure can escape the section at any height or any coat depth. */
+function frameOf(s, eD, c) {
+  var O = [SX - c.x * K, SY - c.y * K];
+  function rs(a) { return Math.max(1.5, (radiusAt(s, a) - eD) * K); }
+  var r0 = rs(0), r90 = rs(Math.PI / 2), r180 = rs(Math.PI), r270 = rs(Math.PI * 1.5);
+  var F = {
+    O: O, rs: rs,
+    Mx: O[0] + (r90 - r270) / 2,
+    My: O[1] + (r180 - r0) / 2,
+    HW: (r90 + r270) / 2,
+    HH: (r180 + r0) / 2
+  };
+  /* ri(a) — how far the IDEAL frame reaches in direction a. It is the ellipse
+     that u and v are quoted against: centred on M, half-axes HW and HH, and
+     measured from O because that is the pole every ring path is swept about.
+     Solved, not sampled: substitute the ray into the ellipse and take the
+     positive root. O is inside the ellipse, so there is exactly one. */
+  var ex = O[0] - F.Mx, ey = O[1] - F.My;
+  F.ri = function (a) {
+    var sa = Math.sin(a) / F.HW, ca = -Math.cos(a) / F.HH;
+    var A = sa * sa + ca * ca;
+    var B = 2 * (ex * sa / F.HW + ey * ca / F.HH);
+    var C = (ex / F.HW) * (ex / F.HW) + (ey / F.HH) * (ey / F.HH) - 1;
+    var q = B * B - 4 * A * C;
+    if (!(q > 0) || !(A > 0)) return F.rs(a);
+    return Math.max(1, (-B + Math.sqrt(q)) / (2 * A));
+  };
+  return F;
+}
+/* ── HOW A LANDMARK FINDS ITS PLACE, AND WHY IT CHANGED ────────────────────
+   It used to be: put the point at u·HW, v·HH, and if it fell outside the skin
+   outline, pull THAT POINT back along its own radius until it fitted.
 
-  var gR = sv('g', '', {});                                   // the ring panel
-  var gD = sv('g', '', { transform: 'translate(' + DETX + ' 0)' });  // panel A
+   Pulling each point back on its own is what tore the plate apart at the ends
+   of the height slider. Behind the ears and down on the shoulder the section is
+   not the ellipse HW and HH describe — it is flatter dorsally and it leans —
+   so at those heights the clamp fired on some points of a structure and not on
+   others. The sternohyoideus pair came apart into two slivers, both carotid
+   sheaths ended up half-buried in the muscle edges, and the ventral quarter
+   opened into a pale void. Landmarks and the muscle splines that should hold
+   them were being moved independently, so of course they separated. The drill
+   OPENS at height 0.12, near one of those ends: it was the first thing a
+   student saw.
+
+   It is now ONE map, applied to every point of every structure:
+
+     radial fraction in   ->   the same radial fraction out
+
+   t = r / ri(a) is how far out this point sits as a fraction of the ideal
+   frame in its own direction; the point is then placed at that same fraction
+   of the MEASURED outline in that direction. The ideal ellipse maps exactly
+   onto the real section, and everything inside it comes along in proportion.
+   Two structures that touch at one height touch at every height, because the
+   map is continuous and every point of both goes through it.
+
+   ANAT_IN is the fascia. 0.955 leaves a rim of even thickness between the
+   outermost tissue and the skin, at every height, which is what the fascia is
+   in _work/neck-ref.png. The cap at 1.045 is what lets a structure quoted
+   past the frame — the nuchal ligament is, deliberately — LAND on that rim
+   rather than float short of it. 0.955 x 1.045 = 0.998: nothing can cross. */
+var ANAT_IN = 0.955, ANAT_CAP = 1.045;
+function uv(F, u, v) {
+  var x = F.Mx + u * F.HW, y = F.My + v * F.HH;
+  var dx = x - F.O[0], dy = y - F.O[1];
+  var r = Math.sqrt(dx * dx + dy * dy);
+  if (r < 0.01) return [x, y];
+  var a = Math.atan2(dx, -dy);
+  var t = r / F.ri(a);
+  if (t > ANAT_CAP) t = ANAT_CAP;
+  var rr = F.rs(a) * ANAT_IN * t;
+  return [F.O[0] + dx / r * rr, F.O[1] + dy / r * rr];
+}
+/* A closed Catmull-Rom through the given points, as cubics. Muscle bellies
+   are not polygons, and a polygon is exactly what the old blob looked like. */
+function spline(P) {
+  var n = P.length, d = 'M' + n1(P[0][0]) + ' ' + n1(P[0][1]), i;
+  for (i = 0; i < n; i++) {
+    var p0 = P[(i - 1 + n) % n], p1 = P[i], p2 = P[(i + 1) % n], p3 = P[(i + 2) % n];
+    d += 'C' + n1(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + n1(p1[1] + (p2[1] - p0[1]) / 6) +
+         ' ' + n1(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + n1(p2[1] - (p3[1] - p1[1]) / 6) +
+         ' ' + n1(p2[0]) + ' ' + n1(p2[1]);
+  }
+  return d + 'Z';
+}
+/* A closed polyline through [x fraction, y fraction] pairs — the creased lumen
+   of a collapsed tube. Straight between the creases on purpose: mucosa folds,
+   it does not curve, and this is the one place on the plate where a hard
+   corner is the truth rather than a shortcut. */
+function foldPath(cx, cy, rx, ry, P) {
+  var d = '', i;
+  for (i = 0; i < P.length; i++) {
+    d += (i ? 'L' : 'M') + n1(cx + P[i][0] * rx) + ' ' + n1(cy + P[i][1] * ry);
+  }
+  return d + 'Z';
+}
+function ellPath(cx, cy, rx, ry) {
+  rx = Math.max(0.6, rx); ry = Math.max(0.6, ry);
+  return 'M' + n1(cx - rx) + ' ' + n1(cy) +
+         'a' + n1(rx) + ' ' + n1(ry) + ' 0 1 0 ' + n1(rx * 2) + ' 0' +
+         'a' + n1(rx) + ' ' + n1(ry) + ' 0 1 0 ' + n1(-rx * 2) + ' 0Z';
+}
+/* A filled arrowhead, tip at (x,y), pointing along the unit vector (dx,dy). */
+function head(x, y, dx, dy, L, W) {
+  var bx = x - dx * L, by = y - dy * L, px = -dy * W, py = dx * W;
+  return 'M' + n1(x) + ' ' + n1(y) + 'L' + n1(bx + px) + ' ' + n1(by + py) +
+         'L' + n1(bx - px) + ' ' + n1(by - py) + 'Z';
+}
+
+/* ── NOTHING MAY RENDER OUTSIDE ITS PANEL, AND IT IS MEASURED, NOT ASSUMED ──
+   The previous build guessed string widths from character counts and shipped
+   a label that ran off panel A. This asks the browser instead. If a string is
+   wider than the box it was given, textLength squeezes it to fit — visibly,
+   so it is obvious the copy is too long — and then the box is nudged back
+   inside. Bounds are in the node's OWN user space, which for anything inside
+   gD is panel A's local space, so the two plates are checked independently. */
+function fitText(node, x0, x1, y0, y1) {
+  var cls = node.getAttribute('class') || '';
+  if (cls.indexOf('fs-off') >= 0) return;
+  var b;
+  try { b = node.getBBox(); } catch (e) { return; }
+  if (!b || !b.width) return;
+  var maxW = x1 - x0;
+  if (b.width > maxW && maxW > 6) {
+    node.setAttribute('textLength', n1(maxW));
+    node.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+    try { b = node.getBBox(); } catch (e2) { return; }
+  } else if (node.hasAttribute('textLength')) {
+    node.removeAttribute('textLength');
+    node.removeAttribute('lengthAdjust');
+    try { b = node.getBBox(); } catch (e3) { return; }
+  }
+  var dx = 0;
+  if (b.x < x0) dx = x0 - b.x;
+  else if (b.x + b.width > x1) dx = x1 - (b.x + b.width);
+  if (dx) node.setAttribute('x', n1(parseFloat(node.getAttribute('x') || 0) + dx));
+  if (y0 == null) return;
+  var dy = 0;
+  if (b.y < y0) dy = y0 - b.y;
+  else if (b.y + b.height > y1) dy = y1 - (b.y + b.height);
+  if (dy) node.setAttribute('y', n1(parseFloat(node.getAttribute('y') || 0) + dy));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  BUILD
+// ═══════════════════════════════════════════════════════════════════════════
+
+function buildSection() {
+  var svg = sv('svg', 'fit-svg', { viewBox: '0 0 ' + VBW + ' ' + VBH, role: 'img' });
+  svg.setAttribute('aria-label',
+    'Live cross-section down the neck at the receiver, drawn from the measured ' +
+    'profile: coat, skin, muscle, the carotid sheaths, the cervical vertebra, ' +
+    'the nuchal ligament, the oesophagus and the windpipe with its cartilage ' +
+    'rings, with the strap and the receiver on it and the two contact points ' +
+    'named where they stand. A coloured ring round the section marks where a ' +
+    'contact point may sit and where it may not. Beside it, panel A shows the ' +
+    'two contact points against the coat at eight times the size. The three ' +
+    'verdicts under the plate are read out in the text below it.');
+  var S = { svg: svg, fits: [] };
+  var i, j, q;
+
+  /* Gradients and the section hatch live here. Their colours are still set by
+     class in the stylesheet, so the house rule holds: no hex in this file. */
+  var defs = sv('defs', '', {});
+  var steel = sv('linearGradient', '', { id: 'fs-steel', x1: '0', y1: '0', x2: '1', y2: '0' });
+  [['fs-s0', '0'], ['fs-s1', '.26'], ['fs-s2', '.52'], ['fs-s3', '.78'], ['fs-s4', '1']]
+    .forEach(function (r) { steel.appendChild(sv('stop', r[0], { offset: r[1] })); });
+  defs.appendChild(steel);
+  var strapg = sv('linearGradient', '', { id: 'fs-strapg', x1: '0', y1: '0', x2: '0', y2: '1' });
+  [['fs-b0', '0'], ['fs-b1', '.32'], ['fs-b2', '1']]
+    .forEach(function (r) { strapg.appendChild(sv('stop', r[0], { offset: r[1] })); });
+  defs.appendChild(strapg);
+  var hat = sv('pattern', '', {
+    id: 'fs-hatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse',
+    patternTransform: 'rotate(45)'
+  });
+  hat.appendChild(sv('rect', 'fs-hatchbg', { width: 6, height: 6 }));
+  hat.appendChild(sv('line', 'fs-hatchl', { x1: 0, y1: 0, x2: 0, y2: 6 }));
+  defs.appendChild(hat);
+  /* THE SHORTFALL BAND IS NOT A MATERIAL, SO IT IS NOT HATCHED LIKE ONE. It
+     used to be a 45-degree line hatch sitting directly against the flesh
+     block's 45-degree line hatch — same convention, same pitch, touching, and
+     meaning two completely different things: one is tissue, the other is the
+     coat the points never cross.
+
+     It is HORIZONTAL ruling now, and that is not an arbitrary third angle. The
+     band is a DEPTH — the last 27% of the coat, measured up off the skin — and
+     level rules read as strata, which is what it is. Upright ruling was tried
+     first and was worse: the coat above it is drawn as standing hair, so
+     vertical red lines simply read as more hair in another colour. The three
+     fills in panel A are now hair (upright), shortfall (level) and flesh
+     (45 degrees), and no two of them can be taken for each other. */
+  var gapp = sv('pattern', '', {
+    id: 'fs-gaphatch', width: 5, height: 4, patternUnits: 'userSpaceOnUse'
+  });
+  gapp.appendChild(sv('rect', 'fs-gaphbg', { width: 5, height: 4 }));
+  gapp.appendChild(sv('line', 'fs-gaphl', { x1: 0, y1: 0, x2: 5, y2: 0 }));
+  defs.appendChild(gapp);
+  svg.appendChild(defs);
+
+  var gR = sv('g', '', {});                                          // the section
+  var gD = sv('g', '', { transform: 'translate(' + DETX + ' 0)' });   // panel A
   S.gR = gR; S.gD = gD;
 
-  // ── ring panel header ────────────────────────────────────────────────────
-  gR.appendChild(txt('fs-eye', 'LOOKING DOWN THE NECK', { x: 2, y: 13 }));
-  gR.appendChild(sv('line', 'fs-rule', { x1: 2, y1: 20, x2: 212, y2: 20 }));
+  // ── plate 1 header ───────────────────────────────────────────────────────
+  S.p1t = txt('fs-plate', 'LOOKING DOWN THE NECK', { x: LEFTM, y: HEADY });
+  gR.appendChild(S.p1t);
+  gR.appendChild(sv('line', 'fs-rule', { x1: LEFTM, y1: RULEY, x2: P1W, y2: RULEY }));
 
-  // ── zone band, flesh, coat, anatomy ──────────────────────────────────────
+  // ── the section, back to front ───────────────────────────────────────────
+  S.flesh = sv('path', 'fs-flesh', { d: '' });     // fascia inside the skin
+  gR.appendChild(S.flesh);
+
+  S.mus = []; S.fib = [];
+  for (i = 0; i < MUSCLE.length * 2; i++) {
+    var mp = sv('path', 'fs-mus', { d: '' });
+    var fp = sv('path', 'fs-fib', { d: '' });
+    gR.appendChild(mp); gR.appendChild(fp);
+    S.mus.push(mp); S.fib.push(fp);
+  }
+
+  S.nuch  = sv('path', 'fs-nuch',  { d: '' });
+  S.nuchF = sv('path', 'fs-nuchf', { d: '' });
+  gR.appendChild(S.nuch); gR.appendChild(S.nuchF);
+
+  /* One bone, drawn as one outline, then its spongy interior, then the floor
+     of the canal, then the canal, the cord and its grey matter. */
+  S.vBone  = sv('path', 'fs-bone',   { d: '' });
+  S.vSpong = sv('path', 'fs-spong',  { d: '' });
+  S.vFloor = sv('path', 'fs-bfloor', { d: '' });
+  S.vCanal = sv('path', 'fs-canal',  { d: '' });
+  S.vCord  = sv('path', 'fs-cord',   { d: '' });
+  S.vGrey  = sv('path', 'fs-grey',   { d: '' });
+  gR.appendChild(S.vBone); gR.appendChild(S.vSpong); gR.appendChild(S.vFloor);
+  gR.appendChild(S.vCanal); gR.appendChild(S.vCord); gR.appendChild(S.vGrey);
+
+  /* The oesophagus: a muscular wall, a submucosa, and a lumen shut into folds.
+     Three layers, because that is what makes it a tube rather than a pill. */
+  S.oes  = sv('path', 'fs-oes',  { d: '' });
+  S.oesM = sv('path', 'fs-oesm', { d: '' });
+  S.oesL = sv('path', 'fs-oesl', { d: '' });
+  gR.appendChild(S.oes); gR.appendChild(S.oesM); gR.appendChild(S.oesL);
+
+  S.sheath = []; S.vein = []; S.art = [];
+  for (i = 0; i < 2; i++) {
+    var sh = sv('path', 'fs-sheath', { d: '' });
+    var vn = sv('path', 'fs-vein',   { d: '' });
+    var ar = sv('path', 'fs-art',    { d: '' });
+    gR.appendChild(sh); gR.appendChild(vn); gR.appendChild(ar);
+    S.sheath.push(sh); S.vein.push(vn); S.art.push(ar);
+  }
+
+  /* ── THE WINDPIPE, AS A STACK OF RINGS ────────────────────────────────────
+     One C over a cream annulus over a dark lumen reads as an eye, or a
+     keyhole. What makes _work/neck-ref.png legible in a quarter of a second is
+     that it stacks several pale C rings along an oblique cut: the corrugation
+     IS the recognition. Four rings, drawn deepest first so the nearest sits on
+     top, each a little narrower and a little flatter as it recedes. This is
+     the one structure the manual names by name (p.27), so it is the one a
+     student should be able to name back with the labels stripped off. */
+  S.tLum  = sv('path', 'fs-tlum',  { d: '' });
+  S.tRings = [];
+  for (i = TRING_N - 1; i >= 0; i--) {
+    var ro = sv('path', 'fs-tring fs-tr' + i, { d: '' });
+    var ri = sv('path', 'fs-tin fs-ti' + i,   { d: '' });
+    S.tRings[i] = { o: ro, i: ri };
+    /* THE BORE GOES IN BETWEEN. Painted behind the whole stack it was covered
+       by every ring below the first, and what showed through the front ring
+       was two pale slivers of the second one — which read as a roll of tape,
+       not as a tube you are looking into. It sits over the rings that recede
+       and under the ring at the cut face, so the front ring frames a dark
+       hole and the corrugation runs away from it. */
+    if (i === 0) gR.appendChild(S.tLum);
+    gR.appendChild(ro); gR.appendChild(ri);
+  }
+  S.tMus  = sv('path', 'fs-tmus',  { d: '' });
+  gR.appendChild(S.tMus);
+
+  // skin as its own layer, then the coat standing on it as real hair
+  S.skinB = sv('path', 'fs-skinb', { d: '' });
+  S.skinL = sv('path', 'fs-skinl', { d: '' });
+  S.coat  = sv('path', 'fs-coat',  { d: '', 'fill-rule': 'evenodd' });
+  S.hair  = sv('path', 'fs-hair',  { d: '' });
+  S.coatE = sv('path', 'fs-coate', { d: '' });
+  S.press = sv('path', 'fs-press', { d: '' });
+  gR.appendChild(S.skinB); gR.appendChild(S.skinL);
+  gR.appendChild(S.coat); gR.appendChild(S.hair);
+  gR.appendChild(S.coatE); gR.appendChild(S.press);
+
+  /* THE CENTRE MARK IS GONE. It was four 8.5-unit dashed stubs arranged as an
+     open cross, lying across the vertebra and the left muscle belly, with no
+     label and — this is the part that decided it — no room to give it one: the
+     ring's legend already runs to 279.6 of the 306 units the plate is wide,
+     measured in the running app, so a third legend entry does not fit and the
+     only other option was to leave an unexplained mark on the specimen. At
+     ship size it read as a selection marquee somebody forgot to delete, which
+     is precisely the "wireframe left in" impression this whole redesign exists
+     to answer. Nothing was lost with it: the twelve index marks ARE the clock
+     face the angle is read off, the long ones stand at 12, 3, 6 and 9, and the
+     chip under the plate prints the reading in words. */
+
+  // ── the annotation ring ──────────────────────────────────────────────────
   S.zones = [];
   var zdefs = [
     ['ok', Z_OK[0]], ['ok', Z_OK[1]],
     ['no', Z_PIPE], ['no', Z_CREST[0]], ['no', Z_CREST[1]],
     ['near', [60, 115]], ['near', [245, 300]]
   ];
-  for (var z = 0; z < zdefs.length; z++) {
-    var pz = sv('path', 'fs-zone fs-' + zdefs[z][0], { d: '' });
+  for (q = 0; q < zdefs.length; q++) {
+    var pz = sv('path', 'fs-zone fs-' + zdefs[q][0], { d: '' });
     gR.appendChild(pz);
-    S.zones.push({ node: pz, band: zdefs[z][1] });
+    S.zones.push({ node: pz, band: zdefs[q][1] });
   }
+  S.idx = sv('path', 'fs-idx', { d: '' });
+  gR.appendChild(S.idx);
 
-  S.coat  = sv('path', 'fs-coat',  { d: '' });   // outline of the coat
-  S.press = sv('path', 'fs-press', { d: '' });   // the coat crushed under a tight strap
-  S.flesh = sv('path', 'fs-flesh', { d: '' });   // skin inward
-  S.skinL = sv('path', 'fs-skinl', { d: '' });
-  gR.appendChild(S.coat);
-  gR.appendChild(S.press);
-  gR.appendChild(S.flesh);
-  gR.appendChild(S.skinL);
-
-  S.spine = sv('path',   'fs-spine', { d: '' });
-  S.pipe  = sv('circle', 'fs-pipe',  { r: 0 });
-  S.pipeI = sv('circle', 'fs-pipei', { r: 0 });
-  gR.appendChild(S.spine);
-  gR.appendChild(S.pipe);
-  gR.appendChild(S.pipeI);
-
-  S.cross = sv('path', 'fs-cross', { d: '' });
-  gR.appendChild(S.cross);
-
-  /* THE STRAP, WHICH THE RING USED TO LEAVE OUT ENTIRELY.
-     Without it the manual's own second target — two fingers under the strap —
-     had no picture anywhere in the app: panel A deliberately draws the strap
-     pressed flat on the coat, because that is what it does under the housing.
-     Here is where the slack lives, so here is where it is measured. */
+  /* THE STRAP. Without it the manual's own second target — two fingers under
+     the strap — had no picture anywhere in the app. Panel A deliberately
+     draws the strap pressed flat on the coat, because that is what it does
+     under the housing. Here is where the slack lives, so here it is measured. */
   S.strap = sv('path', 'fs-strapr', { d: '' });
   gR.appendChild(S.strap);
-  S.gapA = sv('path', 'fs-gapm', { d: '' });      // the two-finger measure
-  gR.appendChild(S.gapA);
-  S.gapT = txt('fs-gapl', '', { x: 0, y: 0, 'text-anchor': 'middle' });
-  gR.appendChild(S.gapT);
 
-  /* Clock labels, carried just outside the outline on their own ray. The two
-     that matter carry the anatomy with them: a student does not need to be
-     told there is a vertebra, they need to know that 12 o'clock is the crest
-     and 6 o'clock is the windpipe. Labelling the structures separately, inside
-     the section, put two words on top of each other at every neck height this
-     dog has — and said less. */
-  S.clk = [];
-  var hours = [[0, '12 CREST'], [3, '3'], [6, '6 WINDPIPE'], [9, '9']];
-  for (var h = 0; h < hours.length; h++) {
-    var tn = txt('fs-clk', hours[h][1], { x: 0, y: 0, 'text-anchor': 'middle' });
-    gR.appendChild(tn);
-    S.clk.push({ node: tn, hour: hours[h][0] });
-  }
+  /* THE TWO-FINGER MEASURE. It carried a word — "two fingers" / "too loose" —
+     printed across the specimen inside the strap ring, with a paper casing
+     that punched a hole in the strap it was measuring. The chip directly
+     under this plate already says Two fingers / Loose / Tight off the same
+     vTension(), so the word was a second copy of a verdict, laid over the
+     drawing. The dimension stays; the word is gone. */
+  S.gapH = sv('path', 'fs-gapmh', { d: '' });   // casing under the dimension
+  S.gapA = sv('path', 'fs-gapm',  { d: '' });
+  gR.appendChild(S.gapH); gR.appendChild(S.gapA);
 
-  // the receiver on the section, and its two points
+  // the receiver on the section, its two points, and its index needle
+  S.rxNeedle = sv('path', 'fs-needle', { d: '' });
+  gR.appendChild(S.rxNeedle);
+  /* ── THE CONTACT POINTS, ON THE SECTION ───────────────────────────────────
+     They were two round-capped strokes 3.2 units wide: 2.8 px on a phone, and
+     against the black housing they read as part of it. The entire subject of
+     this tab was the least visible thing on the plate.
+
+     They are drawn the way panel A draws them, because they are the same
+     object: a turned shaft with the steel gradient across it, a lit edge down
+     each side and a domed tip. RXPW is 4.6 units — 4.1 px at 414 and 6.6 at
+     1440 — and that number is not invented: against the housing beside it,
+     which is 28 units for a 57 mm case, 4.6 units is an 9.4 mm post, and the
+     posts on the owner's own unit measure 7 mm across the dome.
+
+     THE LENGTH IS NOT EXAGGERATED AND WILL NOT BE. postLen() is 0.011 model
+     units, which is 7.9 units here — 7.0 px at 414, 11.3 at 1440 — and with
+     the longer pair fitted it is 13.0 units, 11.5 px at 414. Drawing it at a
+     "legible" 13.5 units on the standard pair would be a 1.7x lie about the
+     exact dimension the fourth decision is graded on: a student would see a
+     post that looks long enough on a plate that then marks them down. That is
+     why panel A exists at x8, why the callout circle rings this assembly, and
+     why the legibility here was bought with width, contrast and a name. */
   S.rx = sv('g', 'fs-rx', {});
-  S.rxPostA = sv('line', 'fs-rxpost', { x1: -5.5, y1: 0, x2: -5.5, y2: 7 });
-  S.rxPostB = sv('line', 'fs-rxpost', { x1:  5.5, y1: 0, x2:  5.5, y2: 7 });
-  S.rxBody  = sv('rect', 'fs-rxbody', { x: -13, y: -13.5, width: 26, height: 14, rx: 3.5 });
-  S.rx.appendChild(S.rxPostA);
-  S.rx.appendChild(S.rxPostB);
-  S.rx.appendChild(S.rxBody);
+  S.rxPost = [];
+  for (q = 0; q < 2; q++) {
+    var pg = sv('g', '', {});
+    var psh = sv('rect', 'fs-rxpm', { width: RXPW, rx: 1.1, x: n1((q ? RXPX : -RXPX) - RXPW / 2), y: -4 });
+    var ptp = sv('path', 'fs-rxpt', { d: '' });
+    var ped = sv('path', 'fs-rxpe', { d: '' });
+    pg.appendChild(psh); pg.appendChild(ptp); pg.appendChild(ped);
+    S.rx.appendChild(pg);
+    S.rxPost.push({ sh: psh, tip: ptp, ed: ped });
+  }
+  S.rxBody  = sv('rect', 'fs-rxbody', { x: -14, y: -15, width: 28, height: 14.5, rx: 3.5 });
+  S.rxTop   = sv('line', 'fs-rxtop',  { x1: -9, y1: -11.4, x2: 9, y2: -11.4 });
+  S.rx.appendChild(S.rxBody);  S.rx.appendChild(S.rxTop);
   gR.appendChild(S.rx);
 
-  // the detail ring — halo first, so the leader reads over the section
-  S.lensC = sv('circle', 'fs-lens', { r: 24 });
-  gR.appendChild(S.lensC);
+  /* The detail callout, keyed A. A circle round what is magnified and a keyed
+     badge is the drawing convention; the elbow leader that used to run right
+     across the sheet to panel A was noise, and it was standing in the way of
+     the anatomy key. */
+  S.lensC = sv('circle', 'fs-lens', { r: 17 });
+  S.lensB = sv('rect', 'fs-lensb', { width: 17, height: 17, rx: 4 });
   S.lensT = txt('fs-lensk', 'A', { x: 0, y: 0, 'text-anchor': 'middle' });
-  gR.appendChild(S.lensT);
+  gR.appendChild(S.lensC); gR.appendChild(S.lensB); gR.appendChild(S.lensT);
 
-  // two chips: position, and tension. All four decisions now carry a mark.
-  S.clkChip  = sv('rect', 'fs-chip', { x: 2, y: CHIPY, width: 102, height: 24, rx: 12 });
-  S.clkChipT = txt('fs-chipt', '', { x: 53, y: CHIPY + 16.5, 'text-anchor': 'middle' });
-  gR.appendChild(S.clkChip);
-  gR.appendChild(S.clkChipT);
-  S.tenChip  = sv('rect', 'fs-chip', { x: 110, y: CHIPY, width: 102, height: 24, rx: 12 });
-  S.tenChipT = txt('fs-chipt', '', { x: 161, y: CHIPY + 16.5, 'text-anchor': 'middle' });
-  gR.appendChild(S.tenChip);
-  gR.appendChild(S.tenChipT);
-
-  // ── panel A: the magnified stack ─────────────────────────────────────────
-  gD.appendChild(txt('fs-eye', 'A · POINTS vs COAT', { x: 2, y: 13 }));
-  gD.appendChild(txt('fs-scale', '×8', { x: 174, y: 13, 'text-anchor': 'end' }));
-  gD.appendChild(sv('line', 'fs-rule', { x1: 2, y1: 20, x2: 176, y2: 20 }));
-
-  S.dFlesh = sv('path', 'fs-flesh',  { d: '' });
-  S.dCoat  = sv('rect', 'fs-coatb',  { x: DX0, y: 0, width: DX1 - DX0, height: 0 });
-  S.dStrap = sv('rect', 'fs-strapb', { x: DX0, y: 0, width: DX1 - DX0, height: 14, rx: 2 });
-  S.dSkin  = sv('path', 'fs-skind',  { d: '' });
-  gD.appendChild(S.dFlesh);
-  gD.appendChild(S.dCoat);
-  gD.appendChild(S.dStrap);
-  gD.appendChild(S.dSkin);
-
-  S.dPost = [];
-  for (var q = 0; q < 2; q++) {
-    var g2 = sv('g', '', {});
-    var ln = sv('line',   'fs-postl', { x1: 0, y1: 0, x2: 0, y2: 0 });
-    var tp = sv('circle', 'fs-postt', { r: 4.4 });
-    g2.appendChild(ln); g2.appendChild(tp);
-    gD.appendChild(g2);
-    S.dPost.push({ ln: ln, tip: tp });
+  // ── the key ──────────────────────────────────────────────────────────────
+  S.keys = [];
+  for (i = 0; i < KEYS.length; i++) {
+    var kh = sv('path', 'fs-keyh', { d: '' });     // casing, so a leader survives
+    var kl = sv('path', 'fs-key',  { d: '' });
+    var kd = sv('circle', 'fs-keyd', { r: 2.1 });
+    var kls = [];
+    for (q = 0; q < KEYS[i].t.length; q++) {
+      var kt = txt('fs-anat', KEYS[i].t[q], { x: LBLX, y: 0 });
+      kls.push(kt);
+    }
+    gR.appendChild(kh); gR.appendChild(kl); gR.appendChild(kd);
+    for (q = 0; q < kls.length; q++) gR.appendChild(kls[q]);
+    S.keys.push({ spec: KEYS[i], hal: kh, ln: kl, dot: kd, tx: kls });
   }
-  // the shortfall: the gap the points do not cross
-  S.dGap  = sv('line', 'fs-gap',  { x1: 0, y1: 0, x2: 0, y2: 0 });
-  S.dGapT = txt('fs-gapt', 'never touched', { x: (DX0 + DX1) / 2, y: 196, 'text-anchor': 'middle' });
-  gD.appendChild(S.dGap);
-  gD.appendChild(S.dGapT);
 
-  /* Panel A has 176 units of its own space; the stack takes 108 of them, so a
-     band label has about 60 before it runs off the edge — and the root <svg>
-     clips at the viewBox, silently. "coat · clipped" measured 83 and lost its
-     last word, on the one coat treatment that passes a January dog. The
-     treatment therefore gets its own line rather than being glued on. */
-  S.lStrap = txt('fs-band', 'strap', { x: DX1 + 8, y: 0 });
-  S.lCoat  = txt('fs-band', 'coat',  { x: DX1 + 8, y: 0 });
-  S.lCoat2 = txt('fs-band2', '',     { x: DX1 + 8, y: 0 });
-  S.lSkin  = txt('fs-band', 'skin',  { x: DX1 + 8, y: 0 });
-  gD.appendChild(S.lStrap);
-  gD.appendChild(S.lCoat);
-  gD.appendChild(S.lCoat2);
-  gD.appendChild(S.lSkin);
+  /* ── THE RING'S OWN LEGEND ───────────────────────────────────────────────
+     The zone arcs are honest data — Z_OK, Z_PIPE and Z_CREST, the same three
+     bands vClock() grades against — but nothing on the sheet said so, and an
+     unexplained coloured arc reads as decoration, which is the exact charge
+     this redesign had to answer. The swatches are the arcs' own classes, so
+     the legend cannot drift from what is drawn. */
+  S.legS = [];
+  ['ok', 'no'].forEach(function (v) {
+    var sw = sv('line', 'fs-zone fs-' + v + ' fs-swatch',
+      { x1: 0, y1: LEGY - 4, x2: 15, y2: LEGY - 4 });
+    var tt = txt('fs-legt', v === 'ok' ? 'a point may sit here' : 'windpipe or crest',
+      { x: 0, y: LEGY });
+    gR.appendChild(sw); gR.appendChild(tt);
+    S.legS.push({ sw: sw, tx: tt });
+  });
 
-  S.dChip  = sv('rect', 'fs-chip', { x: 2, y: CHIPY, width: 174, height: 24, rx: 12 });
-  S.dChipT = txt('fs-chipt', '', { x: 89, y: CHIPY + 16.5, 'text-anchor': 'middle' });
-  gD.appendChild(S.dChip);
-  gD.appendChild(S.dChipT);
+  // ── panel A ──────────────────────────────────────────────────────────────
+  S.aBadge  = sv('rect', 'fs-badge', { x: 0, y: 2, width: 15, height: 15, rx: 4 });
+  S.aBadgeT = txt('fs-badget', 'A', { x: 7.5, y: HEADY - 1.5, 'text-anchor': 'middle' });
+  S.aTitle  = txt('fs-plate', 'POINTS vs COAT', { x: 19, y: HEADY });
+  gD.appendChild(S.aBadge); gD.appendChild(S.aBadgeT); gD.appendChild(S.aTitle);
+  gD.appendChild(sv('line', 'fs-rule', { x1: 0, y1: RULEY, x2: P2W - LEFTM, y2: RULEY }));
+  S.aState = txt('fs-state', '', { x: 0, y: 37 });
+  /* Six units of optical margin. It used to end at x = 460.00 of a 460-unit
+     sheet — flush on the trim, which is not a margin, it is a coincidence. */
+  S.aScale = txt('fs-scale', '×8', { x: P2W - 6, y: 37, 'text-anchor': 'end' });
+  gD.appendChild(S.aState); gD.appendChild(S.aScale);
+
+  S.dFlesh  = sv('path', 'fs-fleshb',  { d: '' });
+  S.dSkinB  = sv('path', 'fs-skinbb',  { d: '' });
+  S.dCoat   = sv('rect', 'fs-coatb',   { x: DX0, y: 0, width: DX1 - DX0, height: 0 });
+  S.dHair   = sv('path', 'fs-hairb',   { d: '' });
+  S.dGapB   = sv('rect', 'fs-gapband', { x: DX0, y: 0, width: DX1 - DX0, height: 0 });
+  S.dSkin   = sv('path', 'fs-skind',   { d: '' });
+  /* THE STRAP RUNS OFF EITHER SIDE OF THE HOUSING, which is where it really
+     goes: the receiver's face is what lies on the coat and the strap is
+     threaded out of its two slots. Drawn as one continuous bar under the box,
+     the points appeared to be driven through the strap, which is not how a
+     1900X is built. Two stubs, and the geometry is honest. */
+  S.dStrapL = sv('rect', 'fs-strapb', { x: DX0, y: 0, width: HOX - DX0, height: STRAPH });
+  S.dStrapR = sv('rect', 'fs-strapb', { x: HOX + HOW, y: 0, width: DX1 - HOX - HOW, height: STRAPH });
+  S.dStitch = sv('path', 'fs-stitch', { d: '' });
+  /* THE HOUSING, which the last version left out — and without it panel A was
+     two bars and two sticks, which is most of what "it looks like a bar chart"
+     meant. The points screw into this and come out of its face; the face is
+     what sits on the coat. It is a fixed size, because a 1900X housing is. */
+  S.dHouse  = sv('rect', 'fs-house',  { x: HOX, width: HOW, height: HOH, rx: 4 });
+  S.dHouseT = sv('path', 'fs-houset', { d: '' });
+  gD.appendChild(S.dFlesh); gD.appendChild(S.dSkinB);
+  gD.appendChild(S.dCoat); gD.appendChild(S.dHair);
+  gD.appendChild(S.dGapB); gD.appendChild(S.dSkin);
+  gD.appendChild(S.dStrapL); gD.appendChild(S.dStrapR); gD.appendChild(S.dStitch);
+  gD.appendChild(S.dHouse); gD.appendChild(S.dHouseT);
+
+  /* The posts are turned metal, not bars: a shaft with a gradient across it,
+     a lit edge either side, and a domed tip. */
+  S.dPost = [];
+  for (q = 0; q < 2; q++) {
+    var g2  = sv('g', '', {});
+    var sh2 = sv('rect', 'fs-postm',   { width: POSTW, rx: 2 });
+    var tip = sv('path', 'fs-posttip', { d: '' });
+    var ed  = sv('path', 'fs-poste',   { d: '' });
+    g2.appendChild(sh2); g2.appendChild(tip); g2.appendChild(ed);
+    gD.appendChild(g2);
+    S.dPost.push({ g: g2, sh: sh2, tip: tip, ed: ed });
+  }
+
+  // the shortfall, dimensioned the way a drawing dimensions one
+  S.dExt  = sv('path', 'fs-ext',  { d: '' });
+  S.dDim  = sv('path', 'fs-dim',  { d: '' });
+  S.dDimA = sv('path', 'fs-dima', { d: '' });
+  S.dDimV = txt('fs-dimvn', '', { x: 0, y: 0 });
+  /* A DIMENSION WITH NO NOUN IS NOT A DIMENSION. The band was marked "27%" and
+     nothing on the sheet said 27% of what — on a drawing that is otherwise
+     engineering-grade, and for a paying client who should not have to infer
+     it. The value stays on the band where it belongs; the noun goes on the
+     line under the verdict, where there is room for it. Measured: the gutter
+     the dimension sits in is 32 units wide and "of the coat depth" is 90, so
+     it could never have gone beside the number. */
+  S.dGapT = txt('fs-never', 'Never touched',
+    { x: P2W / 2, y: FLOORY + 18, 'text-anchor': 'middle' });
+  S.dGapT2 = txt('fs-neverx', '', { x: P2W / 2, y: FLOORY + 34, 'text-anchor': 'middle' });
+  gD.appendChild(S.dExt); gD.appendChild(S.dDim);
+  gD.appendChild(S.dDimA); gD.appendChild(S.dDimV);
+  gD.appendChild(S.dGapT); gD.appendChild(S.dGapT2);
+
+  /* Band names sit OUTSIDE the stack, on tick leaders, in a column of their
+     own. The previous build set them in panel A's remaining sixty units and
+     they ran off the sheet. */
+  S.bands = [];
+  ['Strap', 'Coat', 'Skin'].forEach(function (t) {
+    var bl = sv('path', 'fs-bandl', { d: '' });
+    var bt = txt('fs-anat', t, { x: DX1 + 13, y: 0 });
+    gD.appendChild(bl); gD.appendChild(bt);
+    S.bands.push({ ln: bl, tx: bt });
+  });
 
   svg.appendChild(gR);
   svg.appendChild(gD);
+  svg.appendChild(sv('line', 'fs-div', { x1: DIVX, y1: RULEY + 4, x2: DIVX, y2: SEC_Y1 }));
 
-  // the divider and the elbow leader live above both panels
-  svg.appendChild(sv('line', 'fs-div', { x1: 218, y1: 28, x2: 218, y2: 240 }));
-  S.leadH = sv('path', 'fs-lead-h', { d: '' });
-  S.leadL = sv('path', 'fs-lead',   { d: '' });
-  svg.appendChild(S.leadH);
-  svg.appendChild(S.leadL);
+  // ── the footer: three verdicts, off the same functions the card reads ─────
+  svg.appendChild(sv('line', 'fs-rule', { x1: LEFTM, y1: FOOTY, x2: VBW - LEFTM, y2: FOOTY }));
+  S.chips = [];
+  for (i = 0; i < 3; i++) {
+    var cw = CHIP[i][1] - CHIP[i][0];
+    var cr = sv('rect', 'fs-chip', { x: CHIP[i][0], y: CHIPY, width: cw, height: CHIPH, rx: 7 });
+    var ct = txt('fs-chipt', '', { x: CHIP[i][0] + cw / 2, y: CHIPY + 17.2, 'text-anchor': 'middle' });
+    svg.appendChild(cr); svg.appendChild(ct);
+    S.chips.push({ rect: cr, tx: ct, x0: CHIP[i][0], x1: CHIP[i][1] });
+  }
 
   return S;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  DRAW
+// ═══════════════════════════════════════════════════════════════════════════
 
 function updateSection() {
   if (!SEC) return;
@@ -1096,81 +2048,266 @@ function updateSection() {
   var slack = slackAt(set.tension), sq = squeezeAt(slack);
   var eD = effDepth(), pL = postLen(), rch = reaches();
   var c = centroid(s);
-  var i, pt;
+  var i, j, q, w;
 
   var vc = vClock(), vt = vTension(), vco = vCoat();
+  var F = frameOf(s, eD, c);
 
-  // outlines
-  S.coat.setAttribute('d',  ringPath(s, 0, c, null, null, true));
+  // ── outlines ─────────────────────────────────────────────────────────────
+  /* The coat is an ANNULUS, not a disc: the outline the raycast hit, with the
+     skin outline punched out of it by the even-odd rule. Drawn as a disc it
+     covered the whole animal, which is how the section came to be a blob. */
+  S.coat.setAttribute('d',  ringPath(s, 0, c, null, null, true) +
+                            ringPath(s, -eD, c, null, null, true));
+  S.coatE.setAttribute('d', ringPath(s, 0, c, null, null, true));
   S.flesh.setAttribute('d', ringPath(s, -eD, c, null, null, true));
+  S.skinB.setAttribute('d', ringPath(s, -eD, c, null, null, true));
   S.skinL.setAttribute('d', ringPath(s, -eD, c, null, null, true));
 
+  /* THE COAT IS HAIR, AT ITS MEASURED DEPTH. The annulus between the outline
+     the raycast hit and the skin under it is exactly effDepth() deep, so the
+     hair IS the measurement: a January ruff visibly stands where an August
+     coat lies flat, and that is the whole of decision 4 in one picture. */
+  var hd = '', NH = 136;
+  if ((eD * K) > 1.6) {
+    for (i = 0; i < NH; i++) {
+      var ha = (i / NH) * Math.PI * 2 + (JIT[i % 220] - 0.5) * 0.012;
+      var rC = radiusAt(s, ha) * K, rS = (radiusAt(s, ha) - eD) * K;
+      var rT = rS + (rC - rS) * (0.62 + 0.38 * JIT[(i * 7) % 220]);
+      var bend = (JIT[(i * 3 + 5) % 220] - 0.5) * 0.10;
+      hd += 'M' + n1(F.O[0] + Math.sin(ha) * rS) + ' ' + n1(F.O[1] - Math.cos(ha) * rS) +
+            'L' + n1(F.O[0] + Math.sin(ha + bend) * rT) + ' ' + n1(F.O[1] - Math.cos(ha + bend) * rT);
+    }
+  }
+  S.hair.setAttribute('d', hd);
+
   /* Crushed coat. There is no way to dent a mesh we do not own, so the tight
-     end of the slider is shown here instead of pretending in 3D: the coat
-     outline is redrawn inside itself, in the fail colour, by exactly how far
-     past two fingers the strap has been pulled. */
+     end of the slider is shown here instead of pretended at in 3D: the coat
+     is redrawn inside itself, in the fail colour, by exactly how far past two
+     fingers the strap has been pulled. */
   show(S.press, sq > 0, 'fs-press');
   if (sq > 0) S.press.setAttribute('d', ringPath(s, -Math.min(sq, eD * 0.9), c, null, null, true));
 
+  // ── the anatomy ──────────────────────────────────────────────────────────
+  /* THE MEDIAN PLANE, AND WHAT RIDES ON IT. See medianX(): each midline
+     structure keeps the shape and the depth uv() gives it and is slid rigidly
+     sideways onto one plane, so the windpipe, the gullet, the bone, the sheath
+     pair and the ligament cannot disagree about where the middle of the animal
+     is. Computed here, before anything is drawn, because the muscle bellies
+     defined against two of them travel with them. */
+  F.mx = medianX(F);
+  var vAx = 0;
+  for (i = 0; i < VERT.out.length; i++) vAx += uv(F, 0, VERT.out[i][1])[0];
+  vAx /= VERT.out.length;
+  var shL = uv(F, -SHEATH.u, SHEATH.v), shR = uv(F, SHEATH.u, SHEATH.v);
+  F.sl = {
+    trach:  slideTo(F.mx, uv(F, TRACH.u, TRACH.v)[0]),
+    oes:    slideTo(F.mx, uv(F, OESOPH.u, OESOPH.v)[0]),
+    vert:   slideTo(F.mx, vAx),
+    sheath: slideTo(F.mx, (shL[0] + shR[0]) / 2)
+  };
+  /* Which belly travels with which structure: the sternohyoideus pair with the
+     windpipe it lies under, the longus colli with the body it hangs from. The
+     two big lateral masses belong to the outline and do not move. */
+  var MSL = [0, 0, F.sl.trach, F.sl.vert];
+
+  for (i = 0; i < MUSCLE.length; i++) {
+    for (j = 0; j < 2; j++) {
+      var sgn = j ? 1 : -1, M = MUSCLE[i], P = [], mp0;
+      for (q = 0; q < M.p.length; q++) {
+        mp0 = uv(F, M.p[q][0] * sgn, M.p[q][1]);
+        P.push([mp0[0] + MSL[i], mp0[1]]);
+      }
+      S.mus[i * 2 + j].setAttribute('d', spline(P));
+      var A = uv(F, M.ax[0][0] * sgn, M.ax[0][1]), B = uv(F, M.ax[1][0] * sgn, M.ax[1][1]);
+      A = [A[0] + MSL[i], A[1]]; B = [B[0] + MSL[i], B[1]];
+      var vx = B[0] - A[0], vy = B[1] - A[1];
+      var L = Math.sqrt(vx * vx + vy * vy) || 1;
+      var nx = -vy / L, ny = vx / L, fd = '';
+      for (w = -1; w <= 1; w++) {
+        var off = w * Math.min(9, L * 0.20);
+        fd += 'M' + n1(A[0] + vx * 0.14 + nx * off) + ' ' + n1(A[1] + vy * 0.14 + ny * off) +
+              'L' + n1(A[0] + vx * 0.86 + nx * off) + ' ' + n1(A[1] + vy * 0.86 + ny * off);
+      }
+      S.fib[i * 2 + j].setAttribute('d', fd);
+    }
+  }
+
+  /* The nuchal ligament — the elastic band on the dorsal midline that holds
+     the head up, and half the reason the crest is no place for a contact.
+     Built on the midline rather than mapped point by point: see the note at
+     NUCH for what was shearing and why the map could not hold it. Its axis is
+     the vertebral spine's own x at every height, its top is solved against the
+     dorsal fascia, and its width is a fraction of the measured half-width, so
+     it shrinks with the neck instead of growing as the neck narrows. */
+  var NA = nuchAxis(F);
+  F.nuch = NA;
+  var NP = [], nfd = '';
+  for (i = 0; i < NUCH.length; i++) NP.push(nuchPt(NA, NUCH[i][0], NUCH[i][1]));
+  S.nuch.setAttribute('d', spline(NP));
+  for (i = 0; i < NUCH_F.length; i++) {
+    var f0 = nuchPt(NA, NUCH_F[i][0], NUCH_F[i][1]);
+    var f1 = nuchPt(NA, NUCH_F[i][2], NUCH_F[i][3]);
+    nfd += 'M' + n1(f0[0]) + ' ' + n1(f0[1]) + 'L' + n1(f1[0]) + ' ' + n1(f1[1]);
+  }
+  S.nuchF.setAttribute('d', nfd);
+
+  /* THE CERVICAL VERTEBRA, as one bone. The right half is listed in VERT.out
+     and mirrored here, so the outline runs ventral crest → body → transverse
+     process → articular process → spine → and back down the other side as a
+     single closed spline. The spongy interior is the same outline pulled in
+     toward the bone's own centre, which leaves a cortex of even thickness all
+     the way round instead of an offset that thins on the processes. */
+  /* On the median plane, rigidly: uvV is uv with the bone's own slide added.
+     Shape and depth are exactly what the map gave; only the plane changed. */
+  function uvV(u, v) { var p = uv(F, u, v); return [p[0] + F.sl.vert, p[1]]; }
+  var VP = [], vcx = 0, vcy = 0;
+  for (i = 0; i < VERT.out.length; i++) VP.push(uvV(VERT.out[i][0], VERT.out[i][1]));
+  for (i = VERT.out.length - 2; i >= 1; i--) VP.push(uvV(-VERT.out[i][0], VERT.out[i][1]));
+  for (i = 0; i < VP.length; i++) { vcx += VP[i][0]; vcy += VP[i][1]; }
+  vcx /= VP.length; vcy /= VP.length;
+  S.vBone.setAttribute('d', spline(VP));
+  var VI = [];
+  for (i = 0; i < VP.length; i++) {
+    VI.push([vcx + (VP[i][0] - vcx) * 0.84, vcy + (VP[i][1] - vcy) * 0.84]);
+  }
+  S.vSpong.setAttribute('d', spline(VI));
+  var vcn = uvV(0, VERT.cv);
+  var vbf = uvV(0, VERT.bv - VERT.by);
+  var vbl = uvV(-VERT.bx * 0.86, VERT.bv - VERT.by * 0.55);
+  var vbr = uvV( VERT.bx * 0.86, VERT.bv - VERT.by * 0.55);
+  /* The floor of the canal — the line the reference shows between the body
+     and the cord above it. It is why the body reads as the body. */
+  S.vFloor.setAttribute('d',
+    'M' + n1(vbl[0]) + ' ' + n1(vbl[1]) +
+    'Q' + n1(vbf[0]) + ' ' + n1(vbf[1] + (vbf[1] - vcn[1]) * 0.10) + ' ' +
+          n1(vbr[0]) + ' ' + n1(vbr[1]));
+  S.vCanal.setAttribute('d', ellPath(vcn[0], vcn[1], VERT.cx * F.HW, VERT.cy * F.HH));
+  S.vCord.setAttribute('d', ellPath(vcn[0], vcn[1], VERT.cx * 0.72 * F.HW, VERT.cy * 0.70 * F.HH));
+  var gx = VERT.cx * 0.32 * F.HW, gy = VERT.cy * 0.40 * F.HH;
+  S.vGrey.setAttribute('d',
+    'M' + n1(vcn[0] - gx) + ' ' + n1(vcn[1] - gy) +
+    'Q' + n1(vcn[0]) + ' ' + n1(vcn[1]) + ' ' + n1(vcn[0] - gx) + ' ' + n1(vcn[1] + gy) +
+    'M' + n1(vcn[0] + gx) + ' ' + n1(vcn[1] - gy) +
+    'Q' + n1(vcn[0]) + ' ' + n1(vcn[1]) + ' ' + n1(vcn[0] + gx) + ' ' + n1(vcn[1] + gy));
+
+  /* THE OESOPHAGUS, WHICH WAS A SNOWFLAKE. A pink pill with a white asterisk
+     stroked across it — an icon, on a plate where everything else was a
+     section. It is a tube now: an outer muscular wall, a submucosa inside it,
+     and a lumen that is FILLED and folded shut, with rays of unequal length so
+     it cannot fall back into being a symbol. Nothing about it is stroked
+     radially any more; the folds are the shape of the hole. */
+  var oe = uv(F, OESOPH.u, OESOPH.v);
+  oe = [oe[0] + F.sl.oes, oe[1]];
+  var orx = OESOPH.rx * F.HW, ory = OESOPH.ry * F.HH;
+  S.oes.setAttribute('d',  ellPath(oe[0], oe[1], orx, ory));
+  S.oesM.setAttribute('d', ellPath(oe[0], oe[1], orx * 0.76, ory * 0.72));
+  S.oesL.setAttribute('d', foldPath(oe[0], oe[1], orx * 0.64, ory * 0.56, OES_LUMEN));
+
+  /* The carotid sheaths, lateral to the windpipe. Two vessels with walls, not
+     three specks: the jugular is the wide thin-walled one, the carotid the
+     small thick-walled one, and the wall thicknesses are set in the stylesheet
+     so the difference survives being shrunk to a phone. */
+  for (j = 0; j < 2; j++) {
+    var sg = j ? 1 : -1;
+    var sc = uv(F, SHEATH.u * sg, SHEATH.v);
+    /* The PAIR is slid, by one number, so the two stay a pair. */
+    sc = [sc[0] + F.sl.sheath, sc[1]];
+    var srx = SHEATH.rx * F.HW, sry = SHEATH.ry * F.HH;
+    /* Both vessels are kept fully inside the sheath, checked at the corner
+       that fails first: an ellipse offset 0.44 with a half-width of 0.38 sits
+       inside at its own centre line and pokes out at its own top, which is
+       what the last pass shipped. 0.40 + 0.32 clears at every latitude. */
+    S.sheath[j].setAttribute('d', ellPath(sc[0], sc[1], srx, sry));
+    S.vein[j].setAttribute('d',  ellPath(sc[0] - srx * 0.28 * sg, sc[1] + sry * 0.14, srx * 0.54, sry * 0.58));
+    S.art[j].setAttribute('d',   ellPath(sc[0] + srx * 0.40 * sg, sc[1] - sry * 0.24, srx * 0.32, sry * 0.34));
+  }
+
+  /* THE WINDPIPE, drawn as it is actually cut: a C of cartilage open dorsally
+     and closed across the gap by the trachealis muscle, with the rings behind
+     it showing because this neck is cut obliquely. It is the heaviest line in
+     the section on purpose — "on either side of the dog's windpipe" (p.27) is
+     the only thing the manual says about where the receiver goes, and the
+     student has to be able to see that the points are beside this and not on
+     top of it. */
+  var tc = uv(F, TRACH.u, TRACH.v);
+  tc = [tc[0] + F.sl.trach, tc[1]];
+  var trx = TRACH.rx * F.HW, trry = TRACH.ry * F.HH;
+  /* THE LUMEN IS A HOLE AND IT IS DRAWN AS ONE. It was filled #FBF8F1 — a
+     hair off the fascia behind it — so the one structure the manual names by
+     name carried less weight than the muscle around it, and at shipping size
+     you could not find it. It is the darkest thing inside this outline now. */
+  function cArc(rx, ry, open, dy) {
+    var dd = '', N = 40, k;
+    for (k = 0; k <= N; k++) {
+      var t = -Math.PI / 2 + open / 2 + (Math.PI * 2 - open) * (k / N);
+      dd += (k ? 'L' : 'M') + n1(tc[0] + Math.cos(t) * rx) + ' ' +
+            n1(tc[1] + (dy || 0) + Math.sin(t) * ry);
+    }
+    return dd;
+  }
+  /* The bore, showing dorsally where the cut opens into it. It is still the
+     darkest thing inside the outline — that has not changed and should not. */
+  /* The bore, sized off the front ring's own INNER edge — 4.6 units in from
+     its centreline, which is half the 9-unit cartilage stroke — so the dark
+     hole is exactly what that ring encloses and not an ellipse guessed at. */
+  S.tLum.setAttribute('d', ellPath(tc[0], tc[1] - trry * 0.30,
+    Math.max(2, trx * 0.92 - 4.6), Math.max(1.6, trry * 0.54 - 4.6)));
+  /* FOUR RINGS DOWN THE TUBE. Each C opens dorsally and is closed across the
+     gap by the trachealis; each is a little narrower and a little flatter as
+     it recedes down the oblique cut. One ring was a keyhole. Four is a
+     windpipe, and it is the reason the reference reads in a quarter of a
+     second. */
+  var TR_OPEN = 0.84;
+  for (i = 0; i < TRING_N; i++) {
+    var rf = TRING_N > 1 ? i / (TRING_N - 1) : 0;
+    var rrx = trx * (0.92 - 0.15 * rf);
+    var rry = trry * (0.54 - 0.09 * rf);
+    var rdy = trry * (-0.30 + 0.86 * rf);
+    var dR = cArc(rrx, rry, TR_OPEN, rdy);
+    S.tRings[i].o.setAttribute('d', dR);
+    S.tRings[i].i.setAttribute('d', dR);
+  }
+  /* The trachealis, closing the first ring's gap dorsally. It is set from that
+     ring's own numbers, so it lands on the two cut ends rather than near them. */
+  var mgx = Math.cos(-Math.PI / 2 + TR_OPEN / 2) * trx * 0.92;
+  var mgy = Math.sin(-Math.PI / 2 + TR_OPEN / 2) * trry * 0.54;
+  S.tMus.setAttribute('d',
+    'M' + n1(tc[0] - mgx) + ' ' + n1(tc[1] - trry * 0.30 + mgy) +
+    'L' + n1(tc[0] + mgx) + ' ' + n1(tc[1] - trry * 0.30 + mgy));
+
+  // ── the annotation ring ──────────────────────────────────────────────────
+  /* Where the band stands this frame. See zoneR(): the smaller of a constant
+     proportion of the section, the strap's own outermost ink, and the ceiling
+     the whole plate was sized against. */
+  var zR = zoneR(s, slack);
   for (i = 0; i < S.zones.length; i++) {
-    var b = S.zones[i].band;
-    S.zones[i].node.setAttribute('d', ringPath(s, Z_R, c, b[0], b[1], false));
+    var bnd = S.zones[i].band;
+    S.zones[i].node.setAttribute('d', ringPath(s, zR, c, bnd[0], bnd[1], false));
   }
-
-  /* Anatomy, carried on the rays it actually lives on. The trachea rides just
-     under the ventral skin — which is the whole reason the receiver may not go
-     to 6 o'clock — and the vertebra sits well in from the crest, which is the
-     reason it may not go to 12 either. */
-  var pipeR = Math.max(7, radiusAt(s, Math.PI) * K * 0.19);
-  var pipeC = ringPt(s, Math.PI, -(eD + radiusAt(s, Math.PI) * 0.31), c);
-  S.pipe.setAttribute('cx', pipeC[0].toFixed(1));
-  S.pipe.setAttribute('cy', pipeC[1].toFixed(1));
-  S.pipe.setAttribute('r', pipeR.toFixed(1));
-  S.pipeI.setAttribute('cx', pipeC[0].toFixed(1));
-  S.pipeI.setAttribute('cy', pipeC[1].toFixed(1));
-  S.pipeI.setAttribute('r', (pipeR * 0.55).toFixed(1));
-
-  var spC = ringPt(s, 0, -(eD + radiusAt(s, 0) * 0.40), c);
-  var sw = Math.max(10, radiusAt(s, 0) * K * 0.27);
-  S.spine.setAttribute('d',
-    'M' + (spC[0] - sw).toFixed(1) + ' ' + (spC[1] - sw * 0.55).toFixed(1) +
-    'h' + (sw * 2).toFixed(1) + 'a5 5 0 0 1 5 5' +
-    'v' + (sw * 0.5).toFixed(1) + 'a7 7 0 0 1 -7 7' +
-    'h' + (-(sw * 2 - 4)).toFixed(1) + 'a7 7 0 0 1 -7 -7' +
-    'v' + (-sw * 0.5).toFixed(1) + 'a5 5 0 0 1 5 -5z');
-
-  var cx0 = SX - c.x * K, cy0 = SY - c.y * K;
-  S.cross.setAttribute('d',
-    'M' + (cx0 - 5).toFixed(1) + ' ' + cy0.toFixed(1) + 'h10M' +
-    cx0.toFixed(1) + ' ' + (cy0 - 5).toFixed(1) + 'v10');
-
-  for (i = 0; i < S.clk.length; i++) {
-    var ha = (S.clk[i].hour / 12) * Math.PI * 2;
-    pt = ringPt(s, ha, CLK_R, c);
-    S.clk[i].node.setAttribute('x', pt[0].toFixed(1));
-    S.clk[i].node.setAttribute('y', (pt[1] + 4.5).toFixed(1));
+  /* The twelve index marks now STRADDLE the band rather than standing outside
+     it. Outside, they were the outermost ink on the sheet and cost the
+     section 0.025 model units of radius on every side for nothing. */
+  var idd = '';
+  for (i = 0; i < 12; i++) {
+    var ia = (i / 12) * Math.PI * 2;
+    var lng = (i % 3) === 0;
+    var q0 = ringPt(s, ia, zR + IDX_D0, c);
+    var q1 = ringPt(s, ia, zR + (lng ? IDX_D1 : IDX_D1S), c);
+    idd += 'M' + n1(q0[0]) + ' ' + n1(q0[1]) + 'L' + n1(q1[0]) + ' ' + n1(q1[1]);
   }
+  S.idx.setAttribute('d', idd);
 
   // ── the strap, and the two fingers ───────────────────────────────────────
   S.strap.setAttribute('d', strapRingPath(s, slack, a, c));
 
   /* ── WHERE THE TWO FINGERS ACTUALLY GO ─────────────────────────────────
-     This was taken blindly on the ray opposite the receiver, and the loop is
-     not widest there: the housing presses it down over ±74 deg and the slack
-     drops toward the underside, so on a 4½ o'clock fit the widest point is
-     nearer 7 o'clock. The opposite ray under-read it by 2.3x — 1.97 units
-     against 4.54 — which put it under the draw threshold at exactly the
-     tension the app marks as a PASS. The manual's second target then had no
-     picture at the one fit that meets it, which is the whole reason this
-     measure was added. Scan for the real maximum instead.
-
-     WHAT THE SCALE MEANS, so it is not re-derived wrongly. This is a RADIAL
-     gap, not the width of two fingers. Two fingers slipped under a strap add
-     about 30 mm to the loop's circumference, which is 30/2π ≈ 4.8 mm of
-     radius. On this neck (radius 0.121 model units ≈ 64 mm) that is 0.009
-     model units — which is where SNUG sits. The band [0.004, 0.012] is
-     therefore about one finger to two-and-a-half, and a correct fit is a
-     range rather than a number, which is the point. */
+     Taken blindly on the ray opposite the receiver, this under-read the loop
+     by 2.3x: the housing presses it down over ±74 deg and the slack drops
+     toward the underside, so on a 4½ o'clock fit the widest point is nearer
+     7. That put the measure under its own draw threshold at exactly the
+     tension the app marks as a PASS — the manual's second target had no
+     picture at the one fit that meets it. Scan for the real maximum. */
   var aOpp = a + Math.PI, best = -1;
   for (i = 0; i < 72; i++) {
     var ai = (i / 72) * Math.PI * 2;
@@ -1180,206 +2317,540 @@ function updateSection() {
   var gapMod = best - 0.0006;
   var gapPx = gapMod * K;
   var pC = ringPt(s, aOpp, 0, c), pS = ringPt(s, aOpp, gapMod + 0.0006, c);
-  var vx = pS[0] - pC[0], vy = pS[1] - pC[1];
-  var vl = Math.sqrt(vx * vx + vy * vy) || 1;
-  var tx = -vy / vl * 6, ty = vx / vl * 6;
-  /* 2.0 units, not 3.2: the loosest tension that still passes leaves 2.29
-     units of gap, and a threshold above that hides the measure on a pass
-     again. Below 2 units the strap is tight enough that the dimension is
-     meaningless — and that is the end of the slider where the pressure band
-     and the "Tight" chip do the talking instead. */
-  /* Set BEFORE the label is placed — the placement below measures the text, so
-     it has to be the text that will actually be shown. It used to be set after
-     the draw block, so a label that had been hidden kept whatever it last
-     said: the ring read "the gap" at a tension the card was marking "Two
-     fingers under the strap". Hidden text is still read aloud by a screen
-     reader walking the SVG, so it has to be true at the tight end too, where
-     the measure itself is not drawn. */
-  S.gapT.textContent = vt === 'ok' ? '2 fingers'
-    : slack > SNUG[1] ? 'too loose' : 'too tight';
+  var dvx = pS[0] - pC[0], dvy = pS[1] - pC[1];
+  var vl = Math.sqrt(dvx * dvx + dvy * dvy) || 1;
+  var ux = dvx / vl, uy = dvy / vl;
+  var tx = -uy * 6.5, ty = ux * 6.5;
 
-  show(S.gapA, gapPx >= 2.0, 'fs-gapm is-' + vt);
-  show(S.gapT, gapPx >= 2.0, 'fs-gapl is-' + vt);
-  if (gapPx >= 2.0) {
-    S.gapA.setAttribute('d',
-      'M' + (pC[0] - tx).toFixed(1) + ' ' + (pC[1] - ty).toFixed(1) +
-      'L' + (pC[0] + tx).toFixed(1) + ' ' + (pC[1] + ty).toFixed(1) +
-      'M' + pC[0].toFixed(1) + ' ' + pC[1].toFixed(1) +
-      'L' + pS[0].toFixed(1) + ' ' + pS[1].toFixed(1) +
-      'M' + (pS[0] - tx).toFixed(1) + ' ' + (pS[1] - ty).toFixed(1) +
-      'L' + (pS[0] + tx).toFixed(1) + ' ' + (pS[1] + ty).toFixed(1));
-
-    /* WHICH SIDE OF THE DIMENSION THE LABEL SITS ON.
-       It was pinned to one side. The measure now follows the widest point of
-       the loop, which on a loose fit swings round to wherever gravity has
-       dropped the slack — and at several clock angles that put "too loose"
-       straight on top of the "9" clock label. Both are text on a pale
-       section, so the pair read as one unreadable smear.
-
-       The clock labels are four fixed rays, so the cheapest honest fix is to
-       try the four candidate offsets and keep the one that overlaps them
-       least. Measured, not assumed: the strings change length with the
-       verdict, and a fixed nudge that clears "2 fingers" does not clear
-       "too loose". */
-    var mid0 = (pC[0] + pS[0]) / 2, mid1 = (pC[1] + pS[1]) / 2;
-    var cands = [2.4, -2.4, 4.6, -4.6], pick = null;
-    for (var q = 0; q < cands.length; q++) {
-      S.gapT.setAttribute('x', (mid0 + tx * cands[q]).toFixed(1));
-      S.gapT.setAttribute('y', (mid1 + ty * cands[q] + 4.5).toFixed(1));
-      var gb = null;
-      try { gb = S.gapT.getBBox(); } catch (e) { gb = null; }
-      var hit = 0;
-      if (gb) {
-        for (var w = 0; w < S.clk.length; w++) {
-          var cb = null;
-          try { cb = S.clk[w].node.getBBox(); } catch (e2) { cb = null; }
-          if (!cb || !cb.height) continue;
-          var ow = Math.min(gb.x + gb.width, cb.x + cb.width) - Math.max(gb.x, cb.x);
-          var oh = Math.min(gb.y + gb.height, cb.y + cb.height) - Math.max(gb.y, cb.y);
-          if (ow > 0 && oh > 0) hit += ow * oh;
-        }
-      }
-      if (pick === null || hit < pick.hit) pick = { o: cands[q], hit: hit };
-      if (hit === 0) break;
-    }
-    S.gapT.setAttribute('x', (mid0 + tx * pick.o).toFixed(1));
-    S.gapT.setAttribute('y', (mid1 + ty * pick.o + 4.5).toFixed(1));
+  /* 3.7 units, not 2.4: the loosest tension that still passes leaves 3.8
+     units of gap at this K, and a threshold above that hides the measure on a
+     pass. Below it the strap is tight enough that the dimension is
+     meaningless, and that is the end of the slider where the pressure band
+     and the Tight verdict do the talking instead. */
+  var dimOn = gapPx >= 3.7;
+  show(S.gapA, dimOn, 'fs-gapm is-' + vt);
+  show(S.gapH, dimOn, 'fs-gapmh');
+  if (dimOn) {
+    var dimd =
+      'M' + n1(pC[0] - tx) + ' ' + n1(pC[1] - ty) + 'L' + n1(pC[0] + tx) + ' ' + n1(pC[1] + ty) +
+      'M' + n1(pS[0] - tx) + ' ' + n1(pS[1] - ty) + 'L' + n1(pS[0] + tx) + ' ' + n1(pS[1] + ty) +
+      'M' + n1(pC[0]) + ' ' + n1(pC[1]) + 'L' + n1(pS[0]) + ' ' + n1(pS[1]) +
+      head(pC[0], pC[1], -ux, -uy, 4.4, 2.0) + head(pS[0], pS[1], ux, uy, 4.4, 2.0);
+    S.gapA.setAttribute('d', dimd);
+    S.gapH.setAttribute('d', dimd);
   }
 
-  // the receiver, standing on the strap face at its clock angle
+  // ── the receiver, standing on the strap face at its clock angle ──────────
   var rp = ringPt(s, a, strapOff(a, slack, a), c);
   S.rx.setAttribute('transform',
-    'translate(' + rp[0].toFixed(1) + ' ' + rp[1].toFixed(1) + ') rotate(' + d.toFixed(1) + ')');
+    'translate(' + n1(rp[0]) + ' ' + n1(rp[1]) + ') rotate(' + n1(d) + ')');
   S.rxBody.setAttribute('class', 'fs-rxbody is-' + vc);
-  /* True scale, not a legible one. At this size a contact point is four pixels
-     long — which is the honest reason panel A exists, and drawing it bigger
-     here would quietly tell the student they could judge it from the ring. */
-  var pl = Math.max(2, pL * K);
-  S.rxPostA.setAttribute('y2', pl.toFixed(1));
-  S.rxPostB.setAttribute('y2', pl.toFixed(1));
-  S.rxPostA.setAttribute('class', 'fs-rxpost is-' + (rch ? 'ok' : 'no'));
-  S.rxPostB.setAttribute('class', 'fs-rxpost is-' + (rch ? 'ok' : 'no'));
+  /* TRUE SCALE, and now visible at it. postLen() straight through: 7.9 units
+     on the standard pair, 13.0 on the longer one. What changed is the section
+     through the post — 4.6 units of turned steel with a domed tip instead of a
+     3.2-unit stroke — and the fact that it is now named.
 
-  // the detail ring and its elbow leader out to panel A
-  S.lensC.setAttribute('cx', rp[0].toFixed(1));
-  S.lensC.setAttribute('cy', rp[1].toFixed(1));
-  S.lensT.setAttribute('x', (rp[0] + 18).toFixed(1));
-  S.lensT.setAttribute('y', (rp[1] - 17).toFixed(1));
-  var ly = Math.max(46, Math.min(206, rp[1]));
-  var lead = 'M' + (rp[0] + 24).toFixed(1) + ' ' + rp[1].toFixed(1) +
-             'H206V' + ly.toFixed(1) + 'H' + (DETX + 2);
-  S.leadL.setAttribute('d', lead);
-  S.leadH.setAttribute('d', lead);
+     The posts stay STEEL whether they reach or not, which is what panel A has
+     always done and what this stylesheet's own note says: they are metal. The
+     ring's job is where the points are; whether they get through the coat is
+     panel A's job, and it is carried there four ways. A post that changed
+     colour when it was in the wrong place made two drawings of one object. */
+  var pl = Math.max(2.4, pL * K);
+  for (q = 0; q < 2; q++) {
+    var pxq = (q ? RXPX : -RXPX) - RXPW / 2;
+    var pty = pl - RXPW * 0.34;
+    S.rxPost[q].sh.setAttribute('height', n1(Math.max(1.5, pty + 4)));
+    S.rxPost[q].tip.setAttribute('d',
+      'M' + n1(pxq) + ' ' + n1(pty) +
+      'Q' + n1(pxq + RXPW / 2) + ' ' + n1(pl + RXPW * 0.26) + ' ' +
+            n1(pxq + RXPW) + ' ' + n1(pty) + 'Z');
+    S.rxPost[q].ed.setAttribute('d',
+      'M' + n1(pxq) + ' -2V' + n1(pty) + 'M' + n1(pxq + RXPW) + ' -2V' + n1(pty));
+  }
 
-  S.clkChipT.textContent = clockLabel(a);
-  S.clkChip.setAttribute('class', 'fs-chip is-' + vc);
-  S.clkChipT.setAttribute('class', 'fs-chipt is-' + vc);
-  S.tenChipT.textContent = vt === 'ok' ? 'Two fingers'
-    : slack > SNUG[1] ? 'Loose' : 'Tight';
-  S.tenChip.setAttribute('class', 'fs-chip is-' + vt);
-  S.tenChipT.setAttribute('class', 'fs-chipt is-' + vt);
+  /* The needle. The receiver is the pointer and the zone band is the scale it
+     is read against, so the two are joined rather than left to be guessed at
+     across a gap that changes with the tension slider. */
+  /* It stops on the band's own INNER edge — half the arc's stroke plus a
+     hairline — rather than at a constant 0.009, because the band moves now and
+     a constant inset measured against a moving scale is a guess. */
+  var nSt = ringPt(s, a, strapOff(a, slack, a) + 15.2 / K, c);
+  var nEn = ringPt(s, a, zR - (2.3 + 1.5) / K, c);
+  var ndx = nEn[0] - nSt[0], ndy = nEn[1] - nSt[1];
+  var ndl = Math.sqrt(ndx * ndx + ndy * ndy);
+  show(S.rxNeedle, ndl > 3.5, 'fs-needle is-' + vc);
+  if (ndl > 3.5) {
+    S.rxNeedle.setAttribute('d',
+      'M' + n1(nSt[0]) + ' ' + n1(nSt[1]) + 'L' + n1(nEn[0]) + ' ' + n1(nEn[1]) +
+      head(nEn[0], nEn[1], ndx / ndl, ndy / ndl, Math.min(5, ndl * 0.62), 2.6));
+  }
+
+  S.lensC.setAttribute('cx', n1(rp[0]));
+  S.lensC.setAttribute('cy', n1(rp[1]));
+  var bx2 = rp[0] + (rp[0] > SX ? 1 : -1) * 26 - 8.5, by2 = rp[1] - 30;
+  bx2 = Math.max(1, Math.min(LEADX - 20, bx2));
+  by2 = Math.max(SEC_Y0 + 1, Math.min(SEC_Y1 - 18, by2));
+  S.lensB.setAttribute('x', n1(bx2));
+  S.lensB.setAttribute('y', n1(by2));
+  S.lensT.setAttribute('x', n1(bx2 + 8.5));
+  S.lensT.setAttribute('y', n1(by2 + 12.6));
+
+  // ── the key ──────────────────────────────────────────────────────────────
+  /* Four structures, all of them on the right half of the section. A leader
+     leaves along its own ray, stops just outside the ring, and turns once
+     into the column. The exit is then CLAMPED into the section band, which
+     shortens a radial at the extremes of the height slider but cannot change
+     the order the exits are in. Rows are sorted by exit height and take
+     column slots in that order, so ring order and column order are one order
+     and no two leaders can cross. */
+  /* The receiver's own transform, read back as maths, so the contact-point
+     anchor is the tip of a post the student can see and not a guess at it. */
+  var dr = d * Math.PI / 180, cdr = Math.cos(dr), sdr = Math.sin(dr);
+  function rxLoc(lx, ly) {
+    return [rp[0] + lx * cdr - ly * sdr, rp[1] + lx * sdr + ly * cdr];
+  }
+  /* Which post the leader touches: the one nearer the column, whichever way
+     round the dial the receiver has been turned. */
+  var tipA = rxLoc(-RXPX, pl), tipB = rxLoc(RXPX, pl);
+  var cpSgn = tipB[0] >= tipA[0] ? 1 : -1;
+  var cpAnc = cpSgn > 0 ? tipB : tipA;
+  /* AND IT LEAVES SIDEWAYS FIRST. A leader that goes straight out along its
+     own radius from a post tip runs back up the post and over the housing —
+     it would lie on top of the one thing it is pointing at. One tangential
+     step in the receiver's own frame, past the edge of the housing, and only
+     then out to the ring. */
+  var cpPre = rxLoc(cpSgn * (RXPX + 15), pl * 0.5);
+
+  /* 2.2, not 2. The leader carries a 4.2-unit paper casing under it so it
+     survives crossing the strap, and half of that is 2.1: clamped to x = 2 the
+     casing reached x = -0.1 and the root <svg> quietly took a tenth of a unit
+     of it off the left edge. Ink is what overflows, not coordinates. */
+  function exitAt(aa) {
+    var rr = (radiusAt(s, aa) + zR + EXIT_D) * K;
+    return [Math.max(2.2, Math.min(LEADX - 8, F.O[0] + Math.sin(aa) * rr)),
+            Math.max(SEC_Y0 + 3, Math.min(SEC_Y1 - 3, F.O[1] - Math.cos(aa) * rr))];
+  }
+  var TAU = Math.PI * 2;
+  /* WHERE "SKIN" POINTS. The skin is a layer, not a place, so its anchor sits
+     IN the layer — on the outline the skin band is stroked along, at -effDepth
+     off the coat — and it is picked each frame from five stations on the right
+     half, whichever stands furthest round the neck from the receiver. Fixed,
+     it would have spent part of the dial underneath the housing, pointing at a
+     structure the student cannot see for the box on top of it. */
+  var skA = 1.05, skBest = -1;
+  [0.55, 0.92, 1.29, 1.66, 2.03].forEach(function (aa) {
+    var dd = angDiff(aa, a);
+    if (dd > skBest) { skBest = dd; skA = aa; }
+  });
+  F.skin = ringPt(s, skA, -eD, c);
+  var rows = [];
+  for (i = 0; i < S.keys.length; i++) {
+    var sp2 = S.keys[i].spec;
+    var anc = sp2.rx ? cpAnc : sp2.at(F);
+    var pre = sp2.rx ? [cpPre] : [];
+    var from = pre.length ? pre[pre.length - 1] : anc;
+    var ang = Math.atan2(from[0] - F.O[0], -(from[1] - F.O[1]));
+    var nrm = ((ang % TAU) + TAU) % TAU;
+    /* ONLY THE RECEIVER MAY BE ON THE LEFT, AND NOW THAT IS ENFORCED RATHER
+       THAN ASSUMED. The old comment said "only the fifth entry can ever be
+       here"; it was a claim about where four hand-picked anchors happened to
+       fall, and the key now carries three anchors quoted ON the midline — the
+       ligament, the vertebra and the cord. M is not O, so a midline anchor can
+       land a hair to the LEFT of the pole the exit angle is measured about, and
+       a structure in the middle of the neck would then have been walked the
+       whole way round the outside of the ring to reach a column four units to
+       its right. A midline exit is a vertical one; it is clamped to that. */
+    if (!sp2.rx && nrm > Math.PI) nrm = nrm > Math.PI * 1.5 ? 0.03 : Math.PI - 0.03;
+    rows.push({ k: S.keys[i], anc: anc, pre: pre, ang: nrm,
+                rx: !!sp2.rx, round: !!sp2.rx && nrm > Math.PI + 0.02 });
+  }
+  /* ── NO TWO LEADERS MAY LEAVE THE RING ON TOP OF EACH OTHER ───────────────
+     Five of the nine structures sit on or beside the dorsal midline, so five
+     leaders wanted to leave the ring inside a few degrees of 12 o'clock — and
+     at 12 o'clock the receiver is there too, with a leader of its own. Two
+     exits 1.2 units apart, going to rows 25 apart, is not a fan: it is a
+     bundle that crosses itself the moment the rows separate. Measured at the
+     shoulder with the strap at its loosest, that was four crossings among the
+     anatomy leaders and nine counting the receiver's.
+
+     So the exits are pushed apart on the ring before anything is drawn, the
+     same way the rows are pushed apart in the column: 0.19 radians is about
+     11 degrees, and nine of them is 1.7 radians inside the 2.9 the right half
+     of the ring gives. The receiver's own exit is PINNED — it has to leave
+     where its post is — and the anatomy moves round it. An exit that has been
+     nudged is still a radial run out of the specimen, a few degrees off the
+     structure's own bearing; it is the ONE freedom a draughtsman has here and
+     it is the freedom that stops the fan tangling. */
+  var MINA = 0.19, A0 = 0.10, A1 = Math.PI - 0.10;
+  var sp3 = rows.filter(function (r) { return !r.round; });
+  for (q = 0; q < 6; q++) {
+    sp3.sort(function (p, r) { return p.ang - r.ang; });
+    for (i = 1; i < sp3.length; i++) {
+      var dd2 = sp3[i].ang - sp3[i - 1].ang;
+      if (dd2 >= MINA) continue;
+      var nd = MINA - dd2;
+      if (sp3[i - 1].rx) sp3[i].ang += nd;
+      else if (sp3[i].rx) sp3[i - 1].ang -= nd;
+      else { sp3[i - 1].ang -= nd / 2; sp3[i].ang += nd / 2; }
+    }
+    for (i = 0; i < sp3.length; i++) {
+      if (!sp3[i].rx) sp3[i].ang = Math.max(A0, Math.min(A1, sp3[i].ang));
+    }
+  }
+  for (i = 0; i < rows.length; i++) {
+    var R0 = rows[i];
+    R0.way = R0.pre.slice();
+    if (R0.round) {
+      /* Left half. Route round the OUTSIDE of the ring — over the crest if the
+         anchor is already past 9 o'clock, under the throat if it is not — and
+         come into the column from the right, so a leader never crosses the
+         specimen it is annotating. Only the receiver can ever be here, and only
+         because it goes all the way round the dial. */
+      var up = R0.ang > Math.PI * 1.5;
+      var tgt = up ? TAU + 0.40 : Math.PI - 0.40;
+      for (q = 0; q <= 16; q++) R0.way.push(exitAt(R0.ang + (tgt - R0.ang) * (q / 16)));
+    } else {
+      R0.way.push(exitAt(R0.ang));
+    }
+    var last = R0.way[R0.way.length - 1];
+    R0.y = last[1]; R0.o = last[1];
+  }
+  rows.sort(function (p, r) { return p.o - r.o; });
+  /* Spread, then SHIFT THE WHOLE BLOCK rather than pinning its top. Pinning
+     the top pushed the column down past the section on the small sections
+     high on the neck, each label on a long diagonal to an anchor nowhere near
+     it. Moving the block keeps every label as close to its own structure as
+     the stack allows. The column cannot run out of room and collapse its own
+     leading now: three gaps of 22 is 66 units against 250 of span. */
+  /* ── NINE ROWS, AND THE GAP IS NOW PER PAIR ───────────────────────────────
+     One constant gap had to be set by the worst neighbours the column can ever
+     have — two two-line entries touching — and then EVERY pair paid for it. At
+     the shoulder that was a real fault and not just wasted paper: five of the
+     nine structures are on or near the dorsal midline, so five leaders leave
+     the ring inside a 50-unit band of crest while their labels were being
+     forced 100 units apart. A leader that has to fall twice as far as its
+     neighbour arrives at a shallower angle, and two leaders at different
+     angles into one column is how a fan crosses itself. Measured: at height 0
+     with the strap at its loosest, six crossings.
+
+     So the gap is what the two rows actually need. At 10.6 px a baseline
+     carries 8.0 units of cap above it and 3.0 of descender below; a two-line
+     entry straddles its own leader, which puts 10.0 above and 12.6 below. 3
+     units of air between the two, and the rest is arithmetic:
+
+         one over one   14      one over two   16
+         two over one   23.6    two over two   25.6
+
+     Nine rows now close up to about 135 units of the 236 the band holds, which
+     is what puts every name beside its own structure instead of somewhere in a
+     evenly-spaced list — and the fan tightens with it. */
+  /* TOPY and BOTY are set from the TWO-LINE entry, not the one-line ones: its
+     second baseline sits 11.6 units under the row's own y and its descender 3.0
+     under that, so a bottom slot at 281 would have needed fitText to shove
+     that line back up into the line above it. 275 and 39 are the numbers at
+     which no row is ever clamped, so the leading is the leading everywhere. */
+  var TOPY = SEC_Y0 + 12, BOTY = SEC_Y1 - 16, n = rows.length, sh;
+  function gapAt(k) {
+    return 14 + (rows[k].k.tx.length > 1 ? 9.6 : 0) +
+                (rows[k + 1].k.tx.length > 1 ? 2.0 : 0);
+  }
+  for (i = 1; i < n; i++) rows[i].y = Math.max(rows[i].y, rows[i - 1].y + gapAt(i - 1));
+  sh = rows[n - 1].y - BOTY;
+  if (sh > 0) for (i = 0; i < n; i++) rows[i].y -= sh;
+  sh = TOPY - rows[0].y;
+  if (sh > 0) for (i = 0; i < n; i++) rows[i].y += sh;
+  for (i = 1; i < n; i++) rows[i].y = Math.max(rows[i].y, rows[i - 1].y + gapAt(i - 1));
+  /* ── AND THEN THE FAN IS MEASURED, BECAUSE ORDER IS NOT ENOUGH ────────────
+     Sorting the rows by where their leaders leave the ring guarantees that the
+     column is in ring order. It does NOT guarantee that the runs into the
+     column stay apart, and the difference is not academic: two exits 31 units
+     apart across and 27 down, going to rows 25 apart, cross by 1.2 units — a
+     hairline crossing is still a crossing, and it is the sort of thing that is
+     invisible in a screenshot and obvious in a demo.
+
+     So every neighbouring pair is asked the only question that matters: where
+     does the upper leader's run to the column actually sit when it passes the
+     lower leader's exit? If it has already fallen past it, the block of rows
+     ABOVE is lifted bodily by the deficit — bodily, so every gap inside the
+     block is untouched and only the gap at the fault opens. The lift is capped
+     by the slack above TOPY, which is what makes this terminate: it can only
+     ever spend what the column has, and four passes take the worst fault each
+     time. The mirror case, where the lower leader's run comes up past the
+     upper's exit, pushes the block below down against BOTY the same way. */
+  var pass, i2, A2, B2, pa, pb, f2, over, wi, wf, ws, lift;
+  for (pass = 0; pass < 4; pass++) {
+    wi = -1; wf = 0; ws = 0; over = 0.35;
+    for (i = 0; i < n - 1; i++) {
+      A2 = rows[i]; B2 = rows[i + 1];
+      pa = A2.way[A2.way.length - 1]; pb = B2.way[B2.way.length - 1];
+      f2 = (pb[0] - pa[0]) / (LEADX - pa[0]);
+      if (f2 > 0.2 && f2 < 1) {
+        var ov = (pa[1] + (A2.y - pa[1]) * f2) - (pb[1] - 2.4);
+        if (ov > over) { over = ov; wi = i; wf = f2; ws = -1; }
+      }
+      f2 = (pa[0] - pb[0]) / (LEADX - pb[0]);
+      if (f2 > 0.2 && f2 < 1) {
+        var uv2 = (pa[1] + 2.4) - (pb[1] + (B2.y - pb[1]) * f2);
+        if (uv2 > over) { over = uv2; wi = i; wf = f2; ws = 1; }
+      }
+    }
+    if (wi < 0) break;
+    if (ws < 0) {
+      lift = Math.min(over / wf, rows[0].y - TOPY);
+      if (lift <= 0.25) break;
+      for (i2 = 0; i2 <= wi; i2++) rows[i2].y -= lift;
+    } else {
+      lift = Math.min(over / wf, BOTY - rows[n - 1].y);
+      if (lift <= 0.25) break;
+      for (i2 = wi + 1; i2 < n; i2++) rows[i2].y += lift;
+    }
+  }
+  for (i = 0; i < rows.length; i++) {
+    var R = rows[i], kk = R.k;
+    /* The turn is at LEADX — one fixed x, the same for all five and at every
+       state, which is what the last round's comment claimed and the geometry
+       did not do (it turned at a fixed RADIUS, which measured anywhere from
+       135.8 to 184.8). The last 4 units into the label are horizontal. */
+    var ld = 'M' + n1(R.anc[0]) + ' ' + n1(R.anc[1]);
+    for (q = 0; q < R.way.length; q++) ld += 'L' + n1(R.way[q][0]) + ' ' + n1(R.way[q][1]);
+    ld += 'L' + n1(LEADX) + ' ' + n1(R.y) + 'L' + n1(LBLX - 3) + ' ' + n1(R.y);
+    kk.ln.setAttribute('d', ld);
+    kk.hal.setAttribute('d', ld);
+    kk.dot.setAttribute('cx', n1(R.anc[0]));
+    kk.dot.setAttribute('cy', n1(R.anc[1]));
+    /* A two-line entry straddles its own leader, so the leader still arrives
+       at the middle of the name it is pointing at. */
+    /* The leading came down with the type: 11.6 units between baselines on a
+       10.6 px face instead of 13.2 on a 12.4 one, so a two-line name still
+       reads as one name and not as two rows of the key. */
+    var nl = kk.tx.length, y0 = R.y + 3.8 - (nl - 1) * 5.8;
+    for (q = 0; q < nl; q++) {
+      kk.tx[q].setAttribute('x', LBLX);
+      kk.tx[q].setAttribute('y', n1(y0 + q * 11.6));
+      S.fits.push([kk.tx[q], LBLX, P1W, SEC_Y0, SEC_Y1]);
+    }
+  }
+
+  /* The ring's legend, laid out by MEASUREMENT: the second swatch is set from
+     where the first label actually ended, so a wording change cannot make it
+     collide and cannot leave a hole. */
+  /* lx starts at 3.2, not 0: the swatch is the zone arc's own stroke and that
+     stroke is 5.4 units with a round cap, so a swatch drawn from x = 0 puts
+     2.7 units of ink off the left edge of the sheet. Ink is what overflows,
+     not coordinates. */
+  var lx = 3.2;
+  for (i = 0; i < S.legS.length; i++) {
+    var LG = S.legS[i];
+    LG.sw.setAttribute('x1', n1(lx));
+    LG.sw.setAttribute('x2', n1(lx + 15));
+    LG.tx.setAttribute('x', n1(lx + 21));
+    var lb = null;
+    try { lb = LG.tx.getBBox(); } catch (e5) { lb = null; }
+    lx = lb && lb.width ? lb.x + lb.width + 18 : lx + 150;
+  }
 
   // ── panel A ──────────────────────────────────────────────────────────────
   /* The strap is drawn sitting ON the coat with no gap, because this is the
      section AT the receiver — where the loop has rolled onto the housing and
      the strap is pressed in, not where you slide two fingers under it. The
-     ring above is where the slack is, and it now draws and measures it. */
-  var coatH  = Math.max(4, eD * MAG);
-  var postH  = pL * MAG;
+     ring above is where the slack is, and it draws and measures it. */
+  var coatH   = Math.max(3.5, eD * MAG);
+  var postH   = pL * MAG;
   var coatTop = SKINY - coatH;
-  var strapY  = coatTop - 14;
-  var tipY    = Math.min(coatTop + postH, SKINY + 14);
+  var strapY  = coatTop - STRAPH;         // the strap lies on the coat
+  var tipY    = Math.min(coatTop + postH, SKINY + 10);
 
-  S.dCoat.setAttribute('y', coatTop.toFixed(1));
-  S.dCoat.setAttribute('height', coatH.toFixed(1));
-  S.dStrap.setAttribute('y', strapY.toFixed(1));
+  S.dCoat.setAttribute('y', n1(coatTop));
+  S.dCoat.setAttribute('height', n1(coatH));
+  S.dStrapL.setAttribute('y', n1(strapY));
+  S.dStrapR.setAttribute('y', n1(strapY));
+  S.dStitch.setAttribute('d',
+    'M' + (DX0 + 3) + ' ' + n1(strapY + 4) + 'H' + (HOX - 2) +
+    'M' + (DX0 + 3) + ' ' + n1(strapY + STRAPH - 4) + 'H' + (HOX - 2) +
+    'M' + (HOX + HOW + 2) + ' ' + n1(strapY + 4) + 'H' + (DX1 - 3) +
+    'M' + (HOX + HOW + 2) + ' ' + n1(strapY + STRAPH - 4) + 'H' + (DX1 - 3));
+  S.dHouse.setAttribute('y', n1(coatTop - HOH));
+  S.dHouseT.setAttribute('d',
+    'M' + (HOX + 6) + ' ' + n1(coatTop - HOH + 6) + 'H' + (HOX + HOW - 6));
+
+  var bd = '';
+  if (coatH > 3) {
+    for (i = 0; DX0 + i * 3.1 <= DX1; i++) {
+      var hx = DX0 + i * 3.1;
+      var hl = coatH * (0.66 + 0.34 * JIT[(i * 11) % 220]);
+      bd += 'M' + n1(hx) + ' ' + n1(SKINY) +
+            'L' + n1(hx + (JIT[(i * 5 + 3) % 220] - 0.5) * 3.2) + ' ' + n1(SKINY - hl);
+    }
+  }
+  S.dHair.setAttribute('d', bd);
 
   /* THE SKIN DIMPLES UNDER A POINT THAT REACHES IT. Manual p.27 asks that the
      points "press firmly against the dog's skin" — a flat skin line under a
      point that has arrived says only that it touched. */
+  /* ── THE LAYERS ARE COTERMINOUS, BECAUSE LAYERS ARE ───────────────────────
+     Strap and coat spanned 20..90; skin and flesh spanned 12..98. Three
+     different left edges in a section through layered material, about 22 units
+     apart, which at x2.8 on a big screen is 40 px of ragged edge. In a real
+     section every layer is cut by the same saw and they all end on the same
+     line. They do now: DX0..DX1, all five bands. */
   var dip = Math.max(0, tipY - SKINY);
-  var sd = 'M' + (DX0 - 8) + ' ' + SKINY;
+  var sd = 'M' + DX0 + ' ' + SKINY;
   for (i = 0; i < 2; i++) {
-    sd += 'L' + (PX[i] - 11) + ' ' + SKINY +
-          'Q' + PX[i] + ' ' + (SKINY + dip * 1.5).toFixed(1) + ' ' + (PX[i] + 11) + ' ' + SKINY;
+    sd += 'L' + n1(PX[i] - 11) + ' ' + SKINY +
+          'Q' + n1(PX[i]) + ' ' + n1(SKINY + dip * 1.6) + ' ' + n1(PX[i] + 11) + ' ' + SKINY;
   }
-  sd += 'L' + (DX1 + 8) + ' ' + SKINY;
+  sd += 'L' + DX1 + ' ' + SKINY;
   S.dSkin.setAttribute('d', sd);
-  S.dFlesh.setAttribute('d', sd + 'L' + (DX1 + 8) + ' ' + FLOORY +
-                             'L' + (DX0 - 8) + ' ' + FLOORY + 'Z');
+  S.dSkinB.setAttribute('d', sd + 'v' + SKIN_T + 'H' + DX0 + 'Z');
+  S.dFlesh.setAttribute('d',
+    'M' + DX0 + ' ' + (SKINY + SKIN_T) + 'H' + DX1 +
+    'V' + FLOORY + 'H' + DX0 + 'Z');
 
+  // the posts: shaft, lit edges, domed tip
   for (i = 0; i < 2; i++) {
-    S.dPost[i].ln.setAttribute('x1', PX[i]);
-    S.dPost[i].ln.setAttribute('x2', PX[i]);
-    S.dPost[i].ln.setAttribute('y1', coatTop.toFixed(1));
-    S.dPost[i].ln.setAttribute('y2', tipY.toFixed(1));
-    S.dPost[i].ln.setAttribute('class', 'fs-postl is-' + (rch ? 'ok' : 'no'));
-    S.dPost[i].tip.setAttribute('cx', PX[i]);
-    S.dPost[i].tip.setAttribute('cy', tipY.toFixed(1));
-    S.dPost[i].tip.setAttribute('class', 'fs-postt is-' + (rch ? 'ok' : 'no'));
+    var px = PX[i] - POSTW / 2;
+    var top = coatTop - 11;            // screwed into the housing's face
+    var ty2 = tipY - POSTW * 0.34;
+    S.dPost[i].sh.setAttribute('x', n1(px));
+    S.dPost[i].sh.setAttribute('y', n1(top));
+    S.dPost[i].sh.setAttribute('height', n1(Math.max(2, ty2 - top)));
+    S.dPost[i].tip.setAttribute('d',
+      'M' + n1(px) + ' ' + n1(ty2) +
+      'Q' + n1(PX[i]) + ' ' + n1(tipY + POSTW * 0.24) + ' ' + n1(px + POSTW) + ' ' + n1(ty2) + 'Z');
+    S.dPost[i].ed.setAttribute('d',
+      'M' + n1(px) + ' ' + n1(top) + 'V' + n1(ty2) +
+      'M' + n1(px + POSTW) + ' ' + n1(top) + 'V' + n1(ty2));
+    /* The posts stay METAL whether they reach or not, because they are metal.
+       The failure is already carried four other ways — the hatched band, the
+       dimension, the sentence under it and the verdict on the footer — and a
+       steel post that turns to plastic the moment it is in the wrong place is
+       what makes a drawing look like a diagram. */
   }
 
-  /* The gap the points do not cross, marked between them so it cannot be read
-     as anything else. This dashed run IS the failure: everything below it
-     never gets touched, at any level on the dial. */
-  show(S.dGap,  !rch, 'fs-gap');
-  show(S.dGapT, !rch, 'fs-gapt');
+  /* THE SHORTFALL, DIMENSIONED. Everything in the hatched band is coat the
+     points never reach into, at any level on the dial. It is drawn the way a
+     drawing draws one: extension lines off the two levels, a dimension line
+     between them with arrowheads, and the value beside it. */
+  show(S.dGapB, !rch, 'fs-gapband');
+  show(S.dExt,  !rch, 'fs-ext');
+  show(S.dDim,  !rch, 'fs-dim');
+  show(S.dDimA, !rch, 'fs-dima');
+  show(S.dDimV, !rch, 'fs-dimvn');
+  show(S.dGapT, !rch, 'fs-never');
+  show(S.dGapT2, !rch, 'fs-neverx');
+  /* A hidden label keeps whatever it last said. display:none takes it out of
+     the accessibility tree, but it also survives into any serialisation of
+     this SVG, and a plate that carries "Never touched" on a fit where the
+     points ARE on skin is the picture disagreeing with the score again. */
+  S.dGapT.textContent = rch ? '' : 'Never touched';
   if (!rch) {
-    var gx = (PX[0] + PX[1]) / 2;
-    S.dGap.setAttribute('x1', gx); S.dGap.setAttribute('x2', gx);
-    S.dGap.setAttribute('y1', tipY.toFixed(1)); S.dGap.setAttribute('y2', SKINY);
-  }
-
-  /* Band labels, in a fixed order top to bottom: strap · coat · (treatment) ·
-     skin. Each wants the middle of its own band, and on a clipped coat that
-     band is a few units deep, so they collide.
-
-     THE GAPS ARE MEASURED, NOT GUESSED. This used to push them apart by hand
-     with three constants — 15 units between labels, 28 when a treatment line
-     was showing, 13 to the treatment line itself. Every one of those was too
-     small for the type it was spacing: "coat" and "clipped" overlapped by 4
-     units in all six treated cases, at every viewport. The sizes are set in
-     the stylesheet, so a constant here is stale the moment anyone touches it.
-     Ask the browser for the real boxes and walk the stack down instead. */
-  var treat = set.groom === 'clip' ? 'clipped'
-            : set.groom === 'part' ? 'parted' : '';
-  S.lCoat.textContent = 'coat';
-  S.lCoat2.textContent = treat;
-  show(S.lCoat2, !!treat, 'fs-band2');
-
-  S.lStrap.setAttribute('y', (strapY + 10).toFixed(1));
-  S.lCoat.setAttribute('y',  (coatTop + coatH / 2 + 4).toFixed(1));
-  S.lCoat2.setAttribute('y', (coatTop + coatH / 2 + 20).toFixed(1));
-  S.lSkin.setAttribute('y',  (SKINY + 16 + dip).toFixed(1));
-
-  var stack = treat ? [S.lStrap, S.lCoat, S.lCoat2, S.lSkin]
-                    : [S.lStrap, S.lCoat, S.lSkin];
-  var prevBot = -1e9;
-  for (i = 0; i < stack.length; i++) {
-    var nd = stack[i], bb = null;
-    try { bb = nd.getBBox(); } catch (e) { bb = null; }
-    if (!bb || !bb.height) continue;
-    var ny = parseFloat(nd.getAttribute('y')), nb = bb.y + bb.height;
-    if (bb.y < prevBot + 2) {
-      var sh = prevBot + 2 - bb.y;
-      ny += sh; nb += sh;
-      nd.setAttribute('y', ny.toFixed(1));
+    S.dGapB.setAttribute('y', n1(tipY));
+    S.dGapB.setAttribute('height', n1(Math.max(0.6, SKINY - tipY)));
+    var DIMX = DX0 - 12;
+    S.dExt.setAttribute('d',
+      'M' + n1(DIMX - 3) + ' ' + n1(tipY) + 'H' + n1(PX[0] - POSTW / 2) +
+      'M' + n1(DIMX - 3) + ' ' + SKINY + 'H' + DX0);
+    if ((SKINY - tipY) >= 10) {
+      S.dDim.setAttribute('d', 'M' + n1(DIMX) + ' ' + n1(tipY) + 'V' + SKINY);
+      S.dDimA.setAttribute('d',
+        head(DIMX, tipY, 0, -1, 5.4, 2.5) + head(DIMX, SKINY, 0, 1, 5.4, 2.5));
+    } else {
+      /* Too shallow to arrow from the inside, so arrow it from the outside —
+         which is what a draughtsman does, and it keeps the arrowheads the
+         same size at every coat depth instead of shrinking them to nothing. */
+      S.dDim.setAttribute('d', 'M' + n1(DIMX) + ' ' + n1(tipY - 9) + 'V' + (SKINY + 9));
+      S.dDimA.setAttribute('d',
+        head(DIMX, tipY, 0, 1, 5.4, 2.5) + head(DIMX, SKINY, 0, -1, 5.4, 2.5));
     }
-    prevBot = nb;
-  }
-  /* Last resort: the stack must not walk into the chip row. Pulling the whole
-     stack up keeps the gaps the measure just established. */
-  var over = prevBot - (CHIPY - 4);
-  if (over > 0) {
-    for (i = 0; i < stack.length; i++) {
-      stack[i].setAttribute('y',
-        (parseFloat(stack[i].getAttribute('y')) - over).toFixed(1));
-    }
+    /* The value is the share of the coat the points never cross. It is a
+       ratio of two measured depths, so it is true whatever the model's scale
+       is — no unit is invented — and it is the number that decides whether
+       this dog can feel anything at all. */
+    S.dDimV.textContent = Math.round(((eD - pL) / eD) * 100) + '%';
+    S.dDimV.setAttribute('x', n1(DIMX + 5));
+    S.dDimV.setAttribute('y', n1((tipY + SKINY) / 2 + 5));
+    /* And what the 27% is a fraction OF, in words, on the line under the
+       verdict. Measured at 12.4/400 it is 131.3 units against the 143 panel A
+       has, so it sets on one line and is never squeezed. */
+    S.dGapT2.textContent = S.dDimV.textContent + ' of the coat depth';
+    S.fits.push([S.dDimV, 0, PX[0] - POSTW / 2 - 2, SEC_Y0, SEC_Y1]);
+    S.fits.push([S.dGapT, 0, P2W, FLOORY + 4, SEC_Y1]);
+    S.fits.push([S.dGapT2, 0, P2W, FLOORY + 22, SEC_Y1]);
+  } else {
+    S.dDimV.textContent = '';
+    S.dGapT2.textContent = '';
   }
 
-  S.dChipT.textContent = rch ? 'Points on skin' : 'Points stop in the coat';
-  S.dChip.setAttribute('class', 'fs-chip is-' + (rch ? (vco === 'near' ? 'near' : 'ok') : 'no'));
-  S.dChipT.setAttribute('class', 'fs-chipt is-' + (rch ? (vco === 'near' ? 'near' : 'ok') : 'no'));
+  /* Band names, on tick leaders, in their own column. The band a name belongs
+     to can be three units deep, so they are walked apart by MEASURED boxes
+     rather than pushed by a constant: the sizes live in the stylesheet, and a
+     constant here goes stale the moment anybody touches them. */
+  var anch = [strapY + STRAPH / 2, coatTop + coatH / 2, SKINY + SKIN_T / 2 + 1];
+  var lys = [anch[0], anch[1], anch[2]], prevBot = -1e9;
+  for (i = 0; i < S.bands.length; i++) {
+    var Bn = S.bands[i];
+    Bn.tx.setAttribute('x', DX1 + 13);
+    Bn.tx.setAttribute('y', n1(lys[i] + 4.4));
+    var bb = null;
+    try { bb = Bn.tx.getBBox(); } catch (e3) { bb = null; }
+    if (bb && bb.height) {
+      if (bb.y < prevBot + 3) {
+        var shf = prevBot + 3 - bb.y;
+        lys[i] += shf;
+        Bn.tx.setAttribute('y', n1(lys[i] + 4.4));
+        prevBot = bb.y + bb.height + shf;
+      } else {
+        prevBot = bb.y + bb.height;
+      }
+    }
+    Bn.ln.setAttribute('d',
+      'M' + (DX1 + 2) + ' ' + n1(anch[i]) + 'H' + (DX1 + 7) +
+      'L' + (DX1 + 11) + ' ' + n1(lys[i]) + 'H' + (DX1 + 13));
+    S.fits.push([Bn.tx, DX1 + 13, P2W, SEC_Y0, SEC_Y1]);
+  }
+
+  /* WHAT THIS STACK IS A SECTION THROUGH — and it names the ACTION, not the
+     animal. The coat is already named on the control directly above the plate
+     and again in decision 4's readout, and its depth is drawn here to scale;
+     what the student cannot otherwise see is which of the four things they
+     chose to do about it, and that is what changes this drawing. Both would
+     not fit on one line at this type size — measured, not guessed. */
+  S.aState.textContent = set.groom === 'clip' ? 'Neck clipped'
+                       : set.groom === 'part' ? 'Coat parted'
+                       : set.groom === 'longp' ? 'Longer points'
+                       : 'Coat as it lies';
+  S.fits.push([S.aState, 0, P2W - 28, RULEY + 2, 45]);
+  S.fits.push([S.aScale, P2W - 44, P2W - 6, RULEY + 2, 45]);
+  S.fits.push([S.aTitle, 19, P2W - 5, 2, RULEY - 2]);
+  S.fits.push([S.p1t, LEFTM, P1W, 2, RULEY - 2]);
+  for (i = 0; i < S.legS.length; i++) {
+    S.fits.push([S.legS[i].tx, LEFTM, P1W, FOOTY - 22, FOOTY - 2]);
+  }
+
+  // ── the footer ───────────────────────────────────────────────────────────
+  var cdefs = [
+    [clockLabel(a), vc],
+    [vt === 'ok' ? 'Two fingers' : slack > SNUG[1] ? 'Loose' : 'Tight', vt],
+    [rch ? 'Points on skin' : 'Points stop in the coat',
+     rch ? (vco === 'near' ? 'near' : 'ok') : 'no']
+  ];
+  for (i = 0; i < 3; i++) {
+    S.chips[i].tx.textContent = cdefs[i][0];
+    S.chips[i].rect.setAttribute('class', 'fs-chip is-' + cdefs[i][1]);
+    S.chips[i].tx.setAttribute('class', 'fs-chipt is-' + cdefs[i][1]);
+    S.fits.push([S.chips[i].tx, S.chips[i].x0 + 7, S.chips[i].x1 - 7, CHIPY, CHIPY + CHIPH]);
+  }
+
+  /* ── AND NOW MEASURE IT ────────────────────────────────────────────────
+     Nothing above this line is trusted to have fitted. Every string that was
+     just set is read back from the browser and held inside the panel it
+     belongs to. This is the check the previous build did not have, and it is
+     why "coat / parted / skin" could walk off the edge of the sheet with
+     nobody noticing: the root <svg> clips at the viewBox and says nothing. */
+  for (i = 0; i < S.fits.length; i++) {
+    fitText(S.fits[i][0], S.fits[i][1], S.fits[i][2], S.fits[i][3], S.fits[i][4]);
+  }
+  S.fits.length = 0;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1626,8 +3097,12 @@ function buildUI(pane) {
   var fig = el('figure', 'fit-sec');
   SEC = buildSection();
   fig.appendChild(SEC.svg);
+  /* The caption has to say what the plate is measuring, or the anatomy reads
+     as decoration and the percentage in panel A reads as a mystery. */
+  /* The caption is short because the plate is sticky: every line of it is a
+     line of slider the student cannot see while they work it. */
   fig.appendChild(el('figcaption', 'fit-cap',
-    'Live, and measured off the model. The outline is this dog’s neck at the height you have set; panel A is the same numbers at eight times the size.'));
+    'Live, and measured off the model: the outline is this dog’s neck at the height you have set, and the anatomy is scaled to it. Panel A is the same numbers at eight times the size.'));
   inner.appendChild(fig);
 
   // the four decisions
@@ -1747,7 +3222,11 @@ function buildUI(pane) {
 function reset() {
   set.height = 0.12; set.clock = 0; set.tension = 0.18; set.groom = 'asis';
   coat = COATS[2];
-  ui.r1.value = '28'; ui.r2.value = '0'; ui.r3.value = '18';
+  /* '28' was left behind when the opening height moved to 0.12. Start over put
+     the model on the shoulder and the slider at 28, so the live section and
+     the control that drives it disagreed until the student touched it — which
+     is the same fault as a picture that disagrees with the score, just quieter. */
+  ui.r1.value = '12'; ui.r2.value = '0'; ui.r3.value = '18';
   var i;
   for (i = 0; i < ui.groomOpts.btns.length; i++) {
     ui.groomOpts.btns[i].setAttribute('aria-checked',

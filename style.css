@@ -2034,3 +2034,879 @@ ol,ul{padding:0;list-style:none}
   font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.1em;
   text-transform:uppercase;padding:2px 6px;border-radius:999px;flex:0 0 auto;
 }
+
+/* ============================================================================
+   ▓▓ TAB 3 · THE SECTION PLATE ▓▓  (owner: FIT — appended, nothing above this
+   line edited or removed. Everything here is .fit-* / .fs-* and it overrides
+   only this module's own earlier rules, in cascade order.)
+
+   ── THE PALETTE, AND WHY THE OLD ONE READ CHEAP ────────────────────────────
+   The last one was dusty rose on sage on cream: three colours of roughly the
+   same lightness and the same chroma, none of them committed to anything, so
+   nothing separated from anything and the whole panel read as a wireframe
+   somebody had left in. This one is built the way an anatomical plate is:
+
+     ONE warm tissue family, and it is the only warm thing on the sheet.
+       muscle is the most saturated colour here and it is the only large area
+       that is saturated at all — everything else is a neutral, so the tissue
+       reads as tissue and the instrument reads as instrument.
+     TWO cool accents, and they are used once each.
+       bone and cartilage are cool ivory; the vessels are the only true blue
+       and the only true red inside the section, so a carotid sheath is
+       identifiable at a glance in a picture 130 px across.
+     NEUTRALS carry every line that is not the animal — rules, leaders,
+       dimensions, ticks, the divider, the key. They are the app's own ink
+       ramp, so the plate belongs to the same product as the rest of the tab.
+     THE VERDICT COLOURS are untouched: --ok / --no / --near, the same three
+       the marking card grades with. A colour that means "wrong" here means
+       "wrong" there.
+     ORANGE marks and never explains. It carries the detail callout keyed A
+       and nothing else: at brand lightness it is 2.1:1 on paper.
+
+   ── AND THE TYPE ───────────────────────────────────────────────────────────
+   One scale, four roles, held everywhere:
+     .fs-plate  14.4 / 700 / +.10em / uppercase   what this plate is
+     .fs-anat   14.4 / 500                        what a structure is called
+     .fs-state  14.4 / 600                        what the drawing is showing
+     .fs-dimvn  14.4 / 700 / tabular              a measurement
+     .fs-chipt  14.4 / 700                        a verdict
+   Nothing is smaller than 14.4 against a 460-unit viewBox, and .fit-svg is
+   held at 400 px or wider at every viewport, so the floor is 12.5 CSS px on a
+   phone and about 16 at 1440. Measurements are tabular so a value does not
+   jump sideways as the slider moves under it.
+   ========================================================================== */
+
+/* ── the sheet ───────────────────────────────────────────────────────────── */
+.fit-svg{max-width:548px}
+.fs-plate{font-size:14.4px;font-weight:700;letter-spacing:.10em;fill:var(--ink-3)}
+.fs-anat{font-size:14.4px;font-weight:500;fill:var(--ink-2);letter-spacing:.004em}
+.fs-state{font-size:14.4px;font-weight:600;fill:var(--ink-2)}
+.fs-scale{font-size:14.4px;font-weight:700;letter-spacing:.02em;fill:var(--ink-3);
+          font-variant-numeric:tabular-nums}
+.fs-rule{stroke:var(--line);stroke-width:1}
+.fs-div{stroke:var(--line-soft);stroke-width:1}
+.fs-off{display:none}
+
+/* ── the tissue ──────────────────────────────────────────────────────────── */
+.fs-flesh{fill:#F7EAE4;stroke:none}
+.fs-mus{fill:#DCA096;stroke:#B4736A;stroke-width:.9;stroke-linejoin:round}
+.fs-fib{fill:none;stroke:#B4736A;stroke-width:.7;opacity:.42;stroke-linecap:round}
+.fs-nuch{fill:#EDE7CE;stroke:#C2B78C;stroke-width:.9;stroke-linejoin:round}
+
+/* bone and cartilage are the cool ivory in here, and nothing else is */
+.fs-bone{fill:#EFEAE0;stroke:#AFA795;stroke-width:.9;stroke-linejoin:round}
+.fs-canal{fill:#C6CCD2;stroke:#939CA5;stroke-width:.8}
+.fs-cord{fill:#F1E6C9;stroke:#BFAC82;stroke-width:.8}
+.fs-grey{fill:none;stroke:#B09B6C;stroke-width:1.5;stroke-linecap:round}
+
+.fs-oes{fill:#CE9188;stroke:#A5675E;stroke-width:.9}
+.fs-oesl{fill:none;stroke:#EFDCD6;stroke-width:1;stroke-linecap:round;opacity:.85}
+
+.fs-sheath{fill:#F4E6DF;stroke:#B99A8E;stroke-width:.8}
+.fs-vein{fill:#7C95AC;stroke:#4F6A85;stroke-width:.7}     /* jugular */
+.fs-art{fill:#B4453A;stroke:#832C24;stroke-width:.7}      /* carotid */
+.fs-vagus{fill:#D9CBA9;stroke:#B0A17C;stroke-width:.6}
+
+/* THE WINDPIPE. The heaviest structure on the plate, because "on either side
+   of the dog's windpipe" (p.27) is the only rule the manual gives about where
+   the receiver goes, and the student has to be able to see it at a glance. */
+.fs-tlum{fill:#FBF8F1;stroke:none}
+.fs-tring{fill:none;stroke:#8A7C5E;stroke-width:6.6;stroke-linecap:round}
+.fs-tin{fill:none;stroke:#F1EAD7;stroke-width:4.4;stroke-linecap:round}
+.fs-tmus{fill:none;stroke:#AE7468;stroke-width:2.4;stroke-linecap:round}
+
+/* skin is a LAYER, with a thickness, not a line round a blob */
+.fs-skinb{fill:none;stroke:#EEC9B6;stroke-width:3.6}
+.fs-skinl{fill:none;stroke:#9E6B57;stroke-width:1.1}
+
+/* the coat is an annulus at its MEASURED depth, and the hair standing in it
+   is that measurement — a January ruff stands where an August coat lies flat */
+.fs-coat{fill:#EAE3D6;stroke:none}
+.fs-hair{fill:none;stroke:#A2957F;stroke-width:.65;opacity:.62;stroke-linecap:round}
+.fs-coate{fill:none;stroke:#8C8272;stroke-width:1.05}
+.fs-press{fill:none;stroke:var(--no);stroke-width:2.6;opacity:.8;stroke-dasharray:4.5 3.6}
+.fs-cross{fill:none;stroke:#9A9086;stroke-width:1;opacity:.65}
+
+/* ── the annotation ring ─────────────────────────────────────────────────── */
+/* Butt caps, not round: the seven arcs abut, and round caps put a darker
+   double-struck pip at every join that reads as a mark on the drawing. */
+.fs-zone{fill:none;stroke-width:4.6;stroke-linecap:butt;opacity:1}
+.fs-zone.fs-ok{stroke:var(--ok);opacity:.72}
+.fs-zone.fs-no{stroke:var(--no);opacity:.42}
+.fs-zone.fs-near{stroke:#DFDCD4}
+.fs-idx{fill:none;stroke:#A9A69D;stroke-width:1.1;stroke-linecap:round}
+
+/* ── the collar on the section ───────────────────────────────────────────── */
+.fs-strapr{fill:none;stroke:#22262A;stroke-width:3.6;stroke-linejoin:round}
+.fs-rxbody{fill:#22262A;stroke:#0D0F11;stroke-width:1}
+.fs-rxbody.is-ok{stroke:var(--ok);stroke-width:2}
+.fs-rxbody.is-no{stroke:var(--no);stroke-width:2}
+.fs-rxbody.is-near{stroke:var(--near);stroke-width:2}
+.fs-rxtop{stroke:#5C646C;stroke-width:1.1;stroke-linecap:round}
+.fs-rxpost{stroke:#9AA0A6;stroke-width:2.6;stroke-linecap:round}
+.fs-rxpost.is-ok{stroke:#8E959C}
+.fs-rxpost.is-no{stroke:var(--no)}
+/* the receiver is the pointer and the zone band is the scale it reads on */
+.fs-needle{fill:#7C838B;stroke:#7C838B;stroke-width:1.3;stroke-linejoin:round}
+.fs-needle.is-ok{fill:var(--ok);stroke:var(--ok)}
+.fs-needle.is-no{fill:var(--no);stroke:var(--no)}
+.fs-needle.is-near{fill:var(--near);stroke:var(--near)}
+
+/* the two-finger dimension — the manual's second target, drawn as a dimension */
+.fs-gapm{fill:var(--ink-2);stroke:var(--ink-2);stroke-width:1.2;stroke-linejoin:round}
+.fs-gapm.is-ok{fill:var(--ok);stroke:var(--ok)}
+.fs-gapm.is-no{fill:var(--no);stroke:var(--no)}
+.fs-gapmh{fill:none;stroke:var(--paper);stroke-width:4;stroke-linejoin:round}
+.fs-dimv{font-size:14.4px;font-weight:700;fill:var(--ink-2);
+         paint-order:stroke fill;stroke:var(--paper);stroke-width:3.4;
+         stroke-linejoin:round}
+.fs-dimv.is-ok{fill:var(--ok)}
+.fs-dimv.is-no{fill:var(--no)}
+
+/* the detail callout, keyed A — the one place orange appears on this sheet */
+.fs-lens{fill:none;stroke:var(--hc-orange);stroke-width:1.2;stroke-dasharray:3.6 3}
+.fs-lensb,.fs-badge{fill:var(--hc-orange)}
+.fs-lensk,.fs-badget{font-size:14.4px;font-weight:700;fill:var(--ink)}
+
+/* ── the key: one geometry, one rule ─────────────────────────────────────── */
+.fs-keyh{fill:none;stroke:var(--paper);stroke-width:3.4;stroke-linejoin:round;
+         stroke-linecap:round}
+.fs-key{fill:none;stroke:#A6AAB0;stroke-width:.9;stroke-linejoin:round}
+.fs-keyd{fill:#6E747B}
+
+/* ── panel A: a section, not a bar chart ─────────────────────────────────── */
+.fs-hatchbg{fill:#F7EAE4}
+.fs-hatchl{stroke:#DCBBB0;stroke-width:.9}
+.fs-gaphbg{fill:var(--no);opacity:.13}
+.fs-gaphl{stroke:var(--no);stroke-width:1.1;opacity:.62}
+.fs-fleshb{fill:url(#fs-hatch);stroke:#C8A79C;stroke-width:1}
+.fs-skinbb{fill:#EEC9B6;stroke:none}
+.fs-skind{fill:none;stroke:#9E6B57;stroke-width:1.7}
+.fs-coatb{fill:#EAE3D6;stroke:none}
+.fs-hairb{fill:none;stroke:#A2957F;stroke-width:.9;opacity:.7;stroke-linecap:round}
+.fs-strapb{fill:url(#fs-strapg);stroke:#0D0F11;stroke-width:.8;stroke-linejoin:miter}
+.fs-stitch{fill:none;stroke:#666D74;stroke-width:.8;stroke-dasharray:3 2.4}
+.fs-house{fill:url(#fs-strapg);stroke:#0D0F11;stroke-width:.9}
+.fs-houset{fill:none;stroke:#5A6169;stroke-width:1.1;stroke-linecap:round}
+.fs-b0{stop-color:#3C4147}
+.fs-b1{stop-color:#22262A}
+.fs-b2{stop-color:#141719}
+
+/* the posts stay METAL whether they reach or not, because they are metal. The
+   failure is carried four other ways — the hatched band, the dimension, the
+   sentence under it and the verdict — and a steel post that turns to plastic
+   the moment it is in the wrong place is the kind of thing that makes a
+   drawing look like a diagram. */
+.fs-s0{stop-color:#EDEFF1}
+.fs-s1{stop-color:#C3C9CE}
+.fs-s2{stop-color:#8E959C}
+.fs-s3{stop-color:#B6BCC2}
+.fs-s4{stop-color:#787F86}
+.fs-postm{fill:url(#fs-steel)}
+.fs-posttip{fill:url(#fs-steel)}
+.fs-poste{fill:none;stroke:#6E757C;stroke-width:.9}
+.fs-gapband{fill:url(#fs-gaphatch)}
+
+/* the shortfall, dimensioned the way a drawing dimensions one */
+.fs-ext{fill:none;stroke:#A9AEB4;stroke-width:1}
+.fs-dim{fill:none;stroke:var(--no);stroke-width:1.4}
+.fs-dima{fill:var(--no);stroke:none}
+.fs-dimvn{font-size:14.4px;font-weight:700;fill:var(--no);
+          font-variant-numeric:tabular-nums;
+          paint-order:stroke fill;stroke:var(--paper);stroke-width:3.4;
+          stroke-linejoin:round}
+/* the most valuable sentence in the app. It does not get softened. */
+.fs-never{font-size:14.4px;font-weight:700;fill:var(--no);letter-spacing:.02em}
+.fs-bandl{fill:none;stroke:#B7BBC1;stroke-width:.9;stroke-linejoin:round}
+
+/* ── the footer of verdicts ──────────────────────────────────────────────── */
+.fs-chip{fill:var(--stage);stroke:var(--line);stroke-width:1}
+.fs-chip.is-ok{fill:var(--ok-t);stroke:var(--ok-e)}
+.fs-chip.is-no{fill:var(--no-t);stroke:var(--no-e)}
+.fs-chip.is-near{fill:var(--near-t);stroke:var(--near-e)}
+.fs-chipt{font-size:14.4px;font-weight:700;fill:var(--ink-2)}
+.fs-chipt.is-ok{fill:var(--ok)}
+.fs-chipt.is-no{fill:var(--no)}
+.fs-chipt.is-near{fill:var(--near)}
+
+/* ── the frame the plate sits in ─────────────────────────────────────────── */
+.fit-sec{
+  padding:12px 20px 9px;
+  background:var(--paper);
+  border-top:1px solid var(--line-soft);
+  border-bottom:1px solid var(--line);
+  box-shadow:0 10px 14px -12px rgba(27,30,34,.28);
+}
+.fit-cap{font-size:11px;line-height:1.5;color:var(--ink-3);margin-top:7px}
+
+@media (max-width:1180px){ .fit-svg{max-width:520px} }
+@media (max-width:900px){ .fit-sec{margin:0 -20px;padding:10px 16px 8px} }
+@media (max-width:560px){
+  /* Full bleed. The plate IS the tab at this width, and a unit of label is
+     worth more than a unit of margin: at 414 px this holds the sheet at
+     400 px, which is 0.87 px per unit, which is 12.5 px of type. */
+  .fit-sec{margin:0 -15px;padding:8px 7px 7px}
+  .fit-svg{max-width:400px}
+  .fit-cap{font-size:10.5px;padding:0 6px}
+}
+
+/* ============================================================================
+   ▓▓ TAB 3 · THE SECTION PLATE — ROUND 3 ▓▓  (owner: FIT — appended, nothing
+   above this line edited or removed. Everything here is .fit-* / .fs-* and it
+   overrides only this module's own earlier rules, in cascade order.)
+
+   THE FAULT WAS SIZE, AND SIZE IS ARITHMETIC.
+   The anatomy was right and rendered 91 x 91 CSS px beside a 1440 px dog: a
+   20 px windpipe, 2.9 px contact points, and every line in the drawing under
+   one device pixel, which antialiases to grey mush. Grey mush is what "not
+   premium, not real" looks like. Four things moved, and all four are measured:
+
+     1 · THE RAIL. 38% of the pane, capped at 548, held a 506 px sheet. It is
+         47% capped at 690 now, so the sheet is 656 px at 1440. The dog still
+         has 763 px and it is the evidence, not the lesson: decision 4 cannot
+         be seen on it at all, which is the whole reason this plate exists.
+     2 · THE SHEET. 460x266 -> 460x350, and inside it K went 470 -> 720 —
+         solved, in fitting.js, against a sweep of every height, tension and
+         clock angle. The windpipe is 28.6 units wide instead of 18.6 and
+         lands over 40 CSS px at 1440.
+     3 · EVERY STROKE IS OVER ONE DEVICE PIXEL AT 414. px-per-unit there is
+         0.887, so the floor is 1.2 units. Hair, muscle fibre and leader were
+         0.65 / 0.7 / 0.9 — all of them invisible on a phone and grey at 1440.
+     4 · THE ANNOTATION IS LIGHTER THAN THE SPECIMEN. The key was seven names
+         at 14.4 set larger than the structures they named. It is four names
+         at 12.4, one step down from the plate title in size and two in
+         weight, and the plate titles have gone from --ink-3 (3.39:1 on white,
+         a fail) to --ink-2 (6.7:1).
+
+   AND THE BONE IS COOL. In _work/neck-ref.png the vertebra is blue-grey
+   against pink muscle and cream fascia, which is why it is the second
+   landmark you find. Ivory on ivory gave it an outline and no weight.
+   ========================================================================== */
+
+/* ── 1 · the split, and the sheet ────────────────────────────────────────── */
+.fit-rail{flex:0 0 clamp(408px, 47%, 690px)}
+.fit-card{width:clamp(408px, 47%, 690px)}
+.fit-sec{padding:11px 10px 8px}
+.fit-svg{max-width:656px}
+.fit-cap{font-size:11.5px;line-height:1.45;margin-top:6px}
+
+/* ── 2 · type. One scale, four roles, and the title is legible ink now ───── */
+.fs-plate{font-size:12.8px;font-weight:700;letter-spacing:.06em;fill:var(--ink-2)}
+.fs-anat{font-size:12.4px;font-weight:400;fill:var(--ink-2);letter-spacing:.006em}
+.fs-state{font-size:12.8px;font-weight:600;fill:var(--ink-2)}
+.fs-scale{font-size:12.8px;font-weight:700;letter-spacing:.02em;fill:var(--ink-2);
+          font-variant-numeric:tabular-nums}
+.fs-legt{font-size:12px;font-weight:500;fill:var(--ink-2);letter-spacing:.006em}
+.fs-chipt{font-size:13px;font-weight:700}
+.fs-dimvn{font-size:13.2px}
+.fs-never{font-size:13.2px}
+.fs-lensk,.fs-badget{font-size:12.8px}
+
+/* ── 3 · nothing under one device pixel at 414 (1.2 units at 0.887 px/u) ─── */
+.fs-hair{stroke-width:1.2;opacity:.5}
+.fs-fib{stroke-width:1.2;opacity:.34}
+.fs-key{stroke:#9CA1A8;stroke-width:1.2}
+.fs-keyh{stroke-width:4.2}
+.fs-keyd{fill:#5F666D;r:2.4}
+.fs-idx{stroke:#8E939A;stroke-width:1.35}
+.fs-mus{stroke-width:1.3}
+.fs-nuch{stroke-width:1.3}
+.fs-oes{stroke-width:1.25}
+.fs-oesl{stroke-width:1.25}
+.fs-sheath{stroke-width:1.2}
+.fs-vein{stroke-width:1.2}
+.fs-art{stroke-width:1.2}
+.fs-vagus{stroke-width:1.2}
+.fs-coate{stroke-width:1.35}
+.fs-skinl{stroke-width:1.3}
+.fs-skinb{stroke-width:4.6}
+.fs-hairb{stroke-width:1.2}
+.fs-stitch{stroke-width:1.2}
+.fs-houset{stroke-width:1.3}
+.fs-poste{stroke-width:1.2}
+.fs-bandl{stroke:#A9AEB4;stroke-width:1.2}
+.fs-ext{stroke-width:1.2}
+.fs-hatchl{stroke-width:1.2}
+.fs-gaphl{stroke-width:1.3}
+.fs-tring{stroke-width:8}
+.fs-tin{stroke-width:5.4}
+.fs-tmus{stroke-width:3}
+
+/* ── 4 · THE VERTEBRA. One bone, cool against warm tissue ────────────────── */
+.fs-bone{fill:#A8B4C1;stroke:#6E7C8A;stroke-width:1.5;stroke-linejoin:round}
+.fs-spong{fill:#CDD6DE;stroke:none}
+.fs-bfloor{fill:none;stroke:#6E7C8A;stroke-width:1.3;stroke-linecap:round}
+.fs-canal{fill:#7F8C9A;stroke:#5D6975;stroke-width:1.2}
+.fs-cord{fill:#F0E5C6;stroke:#B7A67D;stroke-width:1.2}
+.fs-grey{fill:none;stroke:#A08B5E;stroke-width:1.9;stroke-linecap:round}
+
+/* ── 5 · the centreline is furniture, not a fracture ─────────────────────── */
+.fs-cross{fill:none;stroke:var(--ink-3);stroke-width:1.2;stroke-dasharray:3.4 2.6;
+          stroke-linecap:butt;opacity:1}
+
+/* ── 6 · the ring, and its legend ────────────────────────────────────────── */
+.fs-zone{stroke-width:5.4}
+.fs-zone.fs-ok{stroke:var(--ok);opacity:.8}
+.fs-zone.fs-no{stroke:var(--no);opacity:.5}
+.fs-zone.fs-near{stroke:#DAD6CD;opacity:1}
+.fs-swatch{stroke-linecap:round}
+
+/* ── 7 · the collar reads at this size ───────────────────────────────────── */
+.fs-strapr{stroke-width:4.4}
+.fs-rxpost{stroke-width:3.2}
+.fs-rxtop{stroke-width:1.3}
+.fs-gapm{stroke-width:1.5}
+.fs-gapmh{stroke-width:4.6}
+.fs-dim{stroke-width:1.6}
+.fs-skind{stroke-width:2}
+.fs-postm,.fs-posttip{fill:url(#fs-steel)}
+
+/* ── 8 · breakpoints. The plate is sticky, so its height is a budget ─────── */
+@media (max-width:1180px){
+  .fit-rail{flex:0 0 clamp(408px, 48%, 620px)}
+  .fit-card{width:clamp(408px, 48%, 620px)}
+  .fit-svg{max-width:580px}
+}
+@media (max-width:900px){
+  /* The rail stops being a rail and becomes the page. This restates the
+     stacking rule because the two clamp rules above it are later in the
+     cascade than the one that used to set it, and a flex-basis of 408 px on a
+     414 px phone left 33 px of slider under a 374 px plate. */
+  .fit-rail{flex:1 1 auto}
+  .fit-card{inset:0;width:auto}
+  .fit-sec{margin:0 -20px;padding:9px 16px 7px}
+  .fit-svg{max-width:520px}
+}
+@media (max-width:560px){
+  /* Full bleed, to the trim. At 414 this holds the sheet at 408 px, which is
+     0.887 px per unit — 11 px of anatomical label and a 25 px windpipe. The
+     plate cannot be made larger here without taking the sliders it answers
+     off the screen: see the note at the top of buildSection(). */
+  .fit-sec{margin:0 -15px;padding:6px 3px 6px}
+  .fit-svg{max-width:408px}
+  .fit-cap{font-size:10.5px;padding:0 5px;line-height:1.4}
+}
+
+/* ── 9 · THE WINDPIPE, which has to be findable at a glance ──────────────────
+   "On either side of the dog's windpipe" (p.27) is the only rule the manual
+   gives about where the receiver goes, so the windpipe is the one structure a
+   student MUST be able to point at. It was cream cartilage round a near-white
+   lumen sitting on near-white fascia — an outline with no weight. The lumen is
+   now the darkest thing inside the section, the cartilage is a pale ring
+   against it, and the ring behind shows through because the cut is oblique.  */
+.fs-tlum{fill:#7A554C;stroke:none}
+.fs-tback{fill:none;stroke:#B08E80;stroke-width:3.4;stroke-linecap:round;opacity:.8}
+.fs-tring{fill:none;stroke:#6A5E44;stroke-width:8.6;stroke-linecap:round}
+.fs-tin{fill:none;stroke:#F5EFDD;stroke-width:5.6;stroke-linecap:round}
+.fs-tmus{fill:none;stroke:#9C6055;stroke-width:3.2;stroke-linecap:round}
+
+/* ── 10 · THE LAST SIX SUB-PIXEL LINES ──────────────────────────────────────
+   Measured in the running app at 414, where the sheet is 0.887 px per unit:
+   the strap stub's outline came out at 0.71 device px, the housing 0.80, and
+   the four 1-unit hairlines — the two plate rules, the divider between them,
+   the chip borders and panel A's flesh block — at 0.89. Under one device pixel
+   a line is not a thin line, it is a grey line, and a sheet of grey lines is
+   what "not premium, not real" looks like. 1.2 units is 1.06 px at 414 and
+   1.71 px at 1440, so every rule on this plate is now ink at both ends.      */
+.fs-rule{stroke-width:1.2}
+.fs-div{stroke-width:1.2}
+.fs-chip{stroke-width:1.2}
+.fs-fleshb{stroke-width:1.2}
+.fs-house{stroke-width:1.2}
+.fs-strapb{stroke-width:1.2}
+
+/* ============================================================================
+   ▓▓ TAB 3 · THE SECTION PLATE — ROUND 4 ▓▓  (owner: FIT — appended, nothing
+   above this line edited or removed. Everything here is .fit-* / .fs-* and it
+   overrides only this module's own earlier rules, in cascade order.)
+
+   THE NOTE BACK WAS THAT THE PLATE NAMED FOUR THINGS THE MANUAL NEVER MENTIONS
+   AND DID NOT NAME THE ONE IT IS ABOUT.
+   Vertebra, Muscle, Carotid and Windpipe each carried about forty pixels of
+   type. The two contact points — the entire subject of p.27 and of this tab —
+   were two 3.2-unit strokes with no leader, no name and no key entry, and at
+   the correct 7:30 fit they read as part of the black housing. Panel A drew
+   them as turned steel; the ring drew them as crayon. Six things moved here,
+   and every one of them is a legibility number rather than a taste:
+
+     1 · THE POSTS ARE A SECTION THROUGH A POST. 4.6 units of turned steel
+         with a lit edge each side and a domed tip — 4.1 px at 414, 6.6 at
+         1440 — instead of a 3.2-unit round-capped stroke at 2.8 px. Their
+         LENGTH is still postLen() exactly, and it always will be.
+     2 · THE WINDPIPE IS A STACK OF RINGS. One C over a cream annulus read as
+         a keyhole. Four C rings receding down an oblique cut is what makes
+         _work/neck-ref.png legible at a glance, and it is the one structure
+         the manual names.
+     3 · THE OESOPHAGUS IS A TUBE, not a pill with an asterisk on it. Wall,
+         submucosa, and a filled lumen folded shut with rays of unequal
+         length.
+     4 · THE SHEATH CARRIES TWO VESSELS, NOT THREE SPECKS. The vagus dot is
+         gone — it was 2 px on a phone — and the two that are left are bigger
+         and have walls: thick on the artery, thin on the vein, which is how
+         you tell them apart when the colour has gone grey.
+     5 · THE CENTRE MARK IS GONE. Four dashed stubs lying across the vertebra
+         with no legend entry available (the legend row already measures 279.6
+         of 306 units) read as a selection marquee left in the render.
+     6 · THE SHORTFALL BAND IS RULED UPRIGHT. It was 45-degree hatch against
+         the flesh block's 45-degree hatch, touching, meaning two different
+         things.
+   ========================================================================== */
+
+/* ── 1 · the contact points, on the section ──────────────────────────────── */
+.fs-rxpm{fill:url(#fs-steel);stroke:#2E343A;stroke-width:.9;stroke-linejoin:round}
+.fs-rxpt{fill:url(#fs-steel);stroke:#2E343A;stroke-width:.9;stroke-linejoin:round}
+.fs-rxpe{fill:none;stroke:#5E656C;stroke-width:1}
+
+/* ── 2 · the windpipe: four rings, weight falling as they recede ─────────── */
+.fs-tring{fill:none;stroke:#6A5E44;stroke-linecap:round}
+.fs-tin{fill:none;stroke:#F5EFDD;stroke-linecap:round}
+.fs-tr0{stroke-width:9}    .fs-ti0{stroke-width:6.2}
+.fs-tr1{stroke-width:7.6}  .fs-ti1{stroke-width:5}
+.fs-tr2{stroke-width:6.4;opacity:.86}  .fs-ti2{stroke-width:4;opacity:.9}
+.fs-tr3{stroke-width:5.4;opacity:.72}  .fs-ti3{stroke-width:3.2;opacity:.8}
+.fs-tlum{fill:#6E463D;stroke:none}
+.fs-tmus{fill:none;stroke:#9C6055;stroke-width:3.2;stroke-linecap:round}
+
+/* ── 3 · the oesophagus. A wall, a submucosa, and a lumen folded shut ────── */
+.fs-oes{fill:#D8A99D;stroke:#9E655B;stroke-width:1.4}
+.fs-oesm{fill:#ECD4CA;stroke:none}
+.fs-oesl{fill:#6E4038;stroke:none;opacity:1}
+
+/* ── 4 · the carotid sheath. Two vessels, and the walls are the tell ─────── */
+.fs-sheath{fill:#F6EAE4;stroke:#B08F82;stroke-width:1.4}
+.fs-vein{fill:#8298AE;stroke:#4F6A85;stroke-width:1.5}    /* jugular: thin wall */
+.fs-art{fill:#AF4238;stroke:#7C2A22;stroke-width:2.6}     /* carotid: thick wall */
+
+/* ── 5 · the nuchal ligament, and the elastic sheets in it ──────────────── */
+.fs-nuch{fill:#EDE7CE;stroke:#BFB183;stroke-width:1.4;stroke-linejoin:round}
+.fs-nuchf{fill:none;stroke:#C9BC91;stroke-width:1.2;stroke-linecap:round;opacity:.85}
+
+/* ── 6 · the shortfall band is ruled upright, so it is not the flesh hatch ─ */
+.fs-gaphbg{fill:var(--no);opacity:.10}
+.fs-gaphl{stroke:var(--no);stroke-width:1.3;opacity:.5}
+
+/* ── 7 · what the 27% is a fraction of ──────────────────────────────────── */
+.fs-neverx{font-size:12.4px;font-weight:400;fill:var(--ink-2);letter-spacing:.006em}
+
+/* ── 8 · THE STICKY PLATE'S BOTTOM EDGE ─────────────────────────────────────
+   On a phone the decision list scrolls under the plate and the plate's own
+   border-bottom cut the next line of type through the middle of its glyphs.
+   Nothing was clipped in the SVG sense — the sweep is clean — but a hard white
+   line across a half-drawn word looks exactly like a clip, and the first thing
+   under it is "4 · The coat between points and skin", which is the decision
+   the whole plate is drawn to answer. A short fade under the rule lets the
+   text arrive instead of being sliced.                                      */
+@media (max-width:900px){
+  .fit-sec::after{
+    content:'';position:absolute;left:0;right:0;top:100%;height:18px;
+    background:linear-gradient(to bottom,var(--paper),rgba(255,255,255,0));
+    pointer-events:none;
+  }
+}
+
+/* ============================================================================
+   ▓▓ TAB 3 · THE SECTION PLATE — ROUND 5 ▓▓  (owner: FIT — appended, nothing
+   above this line edited or removed. Everything here is .fit-* / .fs-* and it
+   overrides only this module's own earlier rules, in cascade order.)
+
+   THE NOTE BACK WAS THAT IT STILL LOOKS LIKE AN APP RATHER THAN A PLATE, AND
+   THE RESIDUAL TEXTURE IT NAMED WAS THE TYPE.
+   The anatomical key was set at 12.4 px, weight 400, ranged left, in the same
+   plain UI grey as the interface around it. That is a caption, and a caption
+   set at caption size beside a drawing competes with the drawing. An
+   anatomical plate SUBORDINATES its key: the names are smaller than anything
+   the drawing says, they are set apart from the running type by their slope,
+   and they hang off hairlines rather than off rules.
+
+     1 · THE KEY IS ITALIC, at 10.6 px instead of 12.4. Slope is what separates
+         a label from a caption on every plate ever printed, and it is the one
+         change that costs nothing in width — measured, italic at 10.6 sets
+         "Spinal cord" in 59.2 units where roman at 10.6 with the tracking that
+         would otherwise be needed takes 62.6. That difference is what let the
+         key grow from five names to NINE without the column eating the
+         specimen: it moved 2 units and gained 5.
+     2 · IT IS LIGHTER. #6E747B is 4.72:1 on paper — still AA at this size, and
+         a clear step down from the --ink-2 (6.7:1) the plate titles keep. The
+         drawing is now the darkest thing on its own plate, which is the whole
+         point of the exercise.
+     3 · THE LEADERS ARE HAIRLINES. They cannot get thinner — 1.2 units is one
+         device pixel at 414 and this file has spent two rounds establishing
+         that a sub-pixel line is a grey line — so they got lighter instead,
+         and their paper casing came down from 4.2 to 3.4 so a leader erases
+         less of the specimen it crosses. The anchor dots went from r 2.4 to
+         1.9: a 2.4 dot on a 10-unit structure was a bullet, not a point.
+     4 · THE ZONE ARCS STOPPED SHOUTING. They were the most saturated ink on an
+         otherwise muted sheet — a green and a pink at .8 and .5 against a
+         palette of ivory, clay and blue-grey. They are the same two hues at
+         .60 and .38 and 4.6 units instead of 5.4. They still read at a glance,
+         which is all they were ever asked to do; the legend under the section
+         is what explains them. Their stand-off now follows the section as well
+         — see zoneR() in fitting.js — so at the top of the height slider the
+         ring is an annotation on the neck instead of a rind around it.
+     5 · THE LEGEND CAME DOWN WITH THE KEY. It was 12 px, which made the two
+         lines that explain the ring larger than the nine names that explain
+         the animal.
+   ========================================================================== */
+
+/* ── 1 · the key: smaller, sloped, lighter ─────────────────────────────────
+   Panel A's three band names carry the same class and the same demotion on
+   purpose. They are annotation on a drawing too, and two registers of label on
+   one sheet is exactly the tell this round was called to remove. */
+.fs-anat{font-size:10.6px;font-style:italic;font-weight:400;
+         letter-spacing:.02em;fill:#6E747B}
+
+/* ── 2 · the leaders, as hairlines ───────────────────────────────────────── */
+.fs-key{stroke:#AEB4BA;stroke-width:1.2}
+.fs-keyh{stroke-width:3.4}
+.fs-keyd{fill:#8B9199;r:1.9}
+.fs-bandl{stroke:#BCC1C6;stroke-width:1.2}
+
+/* ── 3 · the ring, quieter ───────────────────────────────────────────────── */
+.fs-zone{stroke-width:4.6}
+.fs-zone.fs-ok{stroke:var(--ok);opacity:.60}
+.fs-zone.fs-no{stroke:var(--no);opacity:.38}
+.fs-zone.fs-near{stroke:#DEDBD3;opacity:1}
+.fs-idx{stroke:#9BA0A7;stroke-width:1.3}
+
+/* ── 4 · the legend explains the ring; it does not out-rank the animal ───── */
+.fs-legt{font-size:10.8px;font-weight:500;fill:var(--ink-2);letter-spacing:.01em}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TAB 05 · COLLAR CONDITIONING                            (owner: condition.js)
+
+   A field with two bodies in it rather than one object on a turntable, so the
+   left half is a viewport and not a viewer: no reset button, no part index,
+   and a caption strip under it carrying the one reading the drill turns on —
+   whether the line is loaded or slack.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root{
+  /* Scene colours. Lambert materials are MULTIPLIED by a scene lit with a 1.05
+     hemisphere and three directionals, so every lit colour here is set far
+     darker than the colour it should come out as — the same correction the
+     rig materials in tab 04 needed. --cd-sky and --cd-leash are the exceptions:
+     one is the fog and background, the other a basic material, and neither is
+     lit at all, so those two ARE the colour you see. */
+  /* The photographed turf is tinted down by this before it is lit. A Lambert
+     map is MULTIPLIED by the scene, and the scene is a studio — untinted, the
+     generated grass came out pale yellow-sage, nothing like the source image.
+     This is the multiplier, not a colour anyone sees. */
+  --cd-grass-tint:#6F7F63;
+
+  --cd-grass:#26311A;
+  --cd-grass-2:#2C3A1F;
+  --cd-grass-d:#1E2714;
+  --cd-grass-l:#374825;
+  --cd-sky:#BFD2E0;
+  --cd-coat:#20242A;
+  --cd-trouser:#2A2F36;
+  --cd-skin:#6E5238;
+  --cd-leash:#3A2E26;
+  --cd-distract:#7A3418;
+  --cd-shadow:rgba(26,32,20,.5);
+  --cd-shadow-out:rgba(26,32,20,0);
+
+  /* the three verdicts, borrowed from tab 04 so a "clean" here and a pass
+     there are the same blue rather than two nearly-equal blues */
+  --cd-ok:var(--lv-ok);
+  --cd-near:var(--lv-near);
+  --cd-bad:var(--lv-bad);
+
+  --cd-h:min(46vh,340px);       /* stage height once the layout stacks */
+}
+
+.cd{
+  height:100%;min-height:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,392px);
+  overflow:hidden;
+  background:var(--stage);
+}
+.cd[hidden]{display:none}
+
+/* ── left: the field ──────────────────────────────────────────────────── */
+.cd-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.cd-stage{
+  position:relative;flex:1 1 auto;min-height:0;min-width:0;
+  background:var(--cd-sky);
+  overflow:hidden;
+}
+/* The stage host fills the box it is moved into. An id selector in the shell
+   beats [hidden], and the same trap applies to anything given display here. */
+.cd-stage > .st{position:absolute;inset:0}
+
+/* the caption strip: tension, then whatever the drill is asking for */
+.cd-bar{
+  flex:0 0 auto;
+  display:flex;align-items:center;gap:18px;
+  padding:10px 16px;
+  background:var(--paper);
+  border-top:1px solid var(--line);
+}
+.cd-ten{display:flex;align-items:center;gap:10px;flex:0 0 auto;min-width:0}
+.cd-ten-l{
+  font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-3);
+}
+.cd-ten-tr{
+  position:relative;
+  width:190px;height:9px;border-radius:5px;
+  background:var(--line-soft);
+  overflow:hidden;
+}
+.cd-ten-f{
+  height:100%;width:0;border-radius:5px;
+  background:var(--ink-3);
+  transition:width .07s linear, background-color .14s ease;
+}
+/* Where the line counts as loaded. It is drawn ON the track because "loaded"
+   is a threshold the student has to learn to feel, not a word in a legend. */
+.cd-ten-m{
+  position:absolute;top:-2px;bottom:-2px;left:55%;
+  width:2px;background:var(--ink-3);opacity:.5;
+}
+.cd-ten-s{
+  font-size:12px;font-weight:650;color:var(--ink-2);
+  min-width:76px;
+  font-variant-numeric:tabular-nums;
+}
+.cd-ten.is-loaded .cd-ten-f{background:var(--cd-bad)}
+.cd-ten.is-loaded .cd-ten-s{color:var(--cd-bad)}
+.cd-ten.is-taking-up .cd-ten-f{background:var(--hc-orange-d)}
+.cd-ten.is-slack .cd-ten-f{background:var(--cd-ok)}
+.cd-ten.is-slack .cd-ten-s{color:var(--cd-ok)}
+
+.cd-cue{
+  margin:0;flex:1 1 auto;min-width:0;
+  font-size:13px;color:var(--ink-3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.cd-cue.is-live{color:var(--ink);font-weight:600}
+.cd-cue.is-on{color:var(--cd-bad);font-weight:700}
+
+.cd-keys{
+  flex:0 0 auto;
+  display:flex;gap:8px;flex-wrap:wrap;
+  padding:8px 16px 10px;
+  background:var(--paper);
+  border-top:1px solid var(--line-soft);
+}
+.cd-key{display:inline-flex;align-items:center;gap:5px}
+.cd-key b{
+  font:600 10.5px/1 var(--mono);
+  padding:4px 6px;border-radius:5px;
+  background:var(--stage);border:1px solid var(--line);
+  color:var(--ink-2);
+}
+.cd-key i{font-style:normal;font-size:11.5px;color:var(--ink-3)}
+
+/* the whole app takes a beat of red while the collar is live */
+.cd.stim .cd-stage{box-shadow:inset 0 0 0 3px var(--cd-bad)}
+
+/* ── right: the drill ─────────────────────────────────────────────────── */
+.cd-side{
+  display:flex;flex-direction:column;gap:14px;
+  padding:20px 22px 26px;
+  background:var(--paper);
+  border-left:1px solid var(--line);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  min-height:0;
+}
+.cd-kicker{
+  margin:0 0 6px;
+  font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--hc-orange-d);
+}
+.cd-h{
+  margin:0 0 6px;
+  font:400 27px/1.15 var(--serif);
+  letter-spacing:-.01em;color:var(--ink);
+}
+.cd-sub{margin:0;font-size:13.5px;line-height:1.55;color:var(--ink-2)}
+
+.cd-stg{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.cd-stg-n{font-size:12.5px;font-weight:700;color:var(--ink)}
+.cd-pips{display:inline-flex;gap:4px}
+.cd-pip{
+  width:16px;height:4px;border-radius:2px;
+  background:var(--line);
+}
+.cd-pip.done{background:var(--cd-ok)}
+.cd-pip.now{background:var(--hc-orange)}
+
+.cd-learn-l{
+  display:block;margin-bottom:6px;
+  font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-3);
+}
+.cd-learn-tr{
+  position:relative;height:10px;border-radius:5px;
+  background:var(--line-soft);overflow:hidden;
+}
+.cd-learn-f{
+  height:100%;width:0;border-radius:5px;
+  background:var(--hc-blue);
+  transition:width .22s ease;
+}
+/* what this stage needs before she is ready for the next one */
+.cd-learn-need{
+  position:absolute;top:-3px;bottom:-3px;width:2px;
+  background:var(--ink);opacity:.34;
+}
+
+/* the mark for the last rep */
+.cd-mark{
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  padding:11px 13px;border-radius:var(--r);
+  border:1px solid var(--line);
+  background:var(--stage);
+}
+.cd-mark b{font-size:15px;font-weight:700}
+.cd-mark span{font:500 12px/1 var(--mono);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.cd-mark.is-good{background:var(--lv-ok-t);border-color:var(--cd-ok)}
+.cd-mark.is-good b{color:var(--cd-ok)}
+.cd-mark.is-near{background:var(--hc-orange-t);border-color:var(--hc-orange-d)}
+.cd-mark.is-near b{color:var(--hc-orange-d)}
+.cd-mark.is-bad{background:var(--lv-bad-t);border-color:var(--cd-bad)}
+.cd-mark.is-bad b{color:var(--cd-bad)}
+.cd-mark.is-idle b{color:var(--ink-3);font-weight:600}
+
+.cd-coach{
+  margin:0;padding:0 0 0 12px;
+  border-left:3px solid var(--line);
+  font-size:13.5px;line-height:1.6;color:var(--ink-2);
+  min-height:3.2em;
+}
+.cd-coach.is-good{border-left-color:var(--cd-ok)}
+.cd-coach.is-near{border-left-color:var(--hc-orange)}
+.cd-coach.is-bad{border-left-color:var(--cd-bad);color:var(--ink)}
+
+/* ── the transmitter ──────────────────────────────────────────────────── */
+.cd-tx{
+  display:grid;
+  grid-template-columns:74px minmax(0,1fr);
+  grid-template-rows:auto auto;
+  gap:10px 14px;align-items:center;
+  padding:14px;border-radius:var(--r);
+  background:var(--stage);border:1px solid var(--line);
+}
+.cd-tx-svg{grid-row:1 / span 2;width:74px;height:124px;display:block}
+.tx-body{fill:#15181C;stroke:#000;stroke-width:1.5}
+.tx-ant{fill:#15181C}
+.tx-dial{fill:#2B3037;stroke:#0A0C0E;stroke-width:1.5}
+.tx-mark{stroke:var(--hc-orange);stroke-width:3;stroke-linecap:round}
+.tx-lvl{fill:#F2F4F6;font:700 15px var(--mono)}
+.tx-nick{fill:#3A4048;stroke:#0A0C0E;stroke-width:1.5;transition:fill .06s linear}
+.tx-nick.on{fill:var(--cd-bad)}
+.tx-nickt{fill:#C9CED4;font:700 10px var(--sans);letter-spacing:.08em}
+.tx-pad{fill:#23272D}
+
+.cd-nick{
+  align-self:stretch;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  padding:14px 10px;border-radius:var(--r);
+  border:1px solid var(--ink);
+  background:var(--ink);color:var(--paper);
+  cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none;
+  transition:background-color .06s linear, transform .06s ease;
+}
+.cd-nick:hover{background:#000}
+.cd-nick.on{background:var(--cd-bad);border-color:var(--cd-bad);transform:translateY(1px)}
+.cd-nick-k{font:700 9.5px/1 var(--mono);letter-spacing:.12em;opacity:.66}
+.cd-nick-l{font-size:15px;font-weight:700}
+
+.cd-lv{display:flex;align-items:center;gap:8px}
+.cd-lvb{
+  width:30px;height:30px;border-radius:8px;
+  border:1px solid var(--line);background:var(--paper);
+  font-size:16px;line-height:1;color:var(--ink);cursor:pointer;
+}
+.cd-lvb:hover{background:var(--stage)}
+.cd-lvn{
+  font:700 17px/1 var(--mono);color:var(--ink);
+  min-width:34px;text-align:center;font-variant-numeric:tabular-nums;
+}
+.cd-lvt{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+
+/* ── the tally ────────────────────────────────────────────────────────── */
+.cd-tally{
+  margin:0;display:grid;grid-template-columns:1fr auto;gap:3px 12px;
+  font-size:12.5px;
+}
+.cd-tally dt{color:var(--ink-3)}
+.cd-tally dd{
+  margin:0;text-align:right;font-weight:700;color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+
+.cd-again{
+  margin-top:auto;align-self:flex-start;
+  padding:9px 16px;border-radius:8px;
+  border:1px solid var(--line);background:var(--paper);
+  font-size:13px;font-weight:600;color:var(--ink-2);cursor:pointer;
+}
+.cd-again:hover{background:var(--stage);color:var(--ink)}
+
+/* ── a fifth tab in the rail ──────────────────────────────────────────── */
+/* Between 860 and 1000 the five tabs plus the DRILLS divider no longer fit on
+   one line at full size, and .tabs is a nowrap flex row, so the last one would
+   simply hang off the edge. Tightening the padding buys back the ~90 px that
+   the fifth tab costs. */
+@media (min-width:860px) and (max-width:1040px){
+  .tab{padding:0 9px;gap:6px}
+  .tl{font-size:12.5px}
+}
+
+@media (max-width:859px){
+  /* five columns now, not four */
+  .tabs{grid-template-columns:repeat(5,1fr)}
+  /* "Collar conditioning" is the one label that cannot fit a fifth of a phone
+     on one line. Wrapping is per-rail rather than per-tab: the label must not
+     change with the viewport (the accessible name would change with it), so
+     the rail lets every label wrap and only this one actually does. */
+  .tl{white-space:normal;line-height:1.16;text-overflow:clip}
+
+  .cd{
+    display:block;height:100%;
+    overflow-y:auto;-webkit-overflow-scrolling:touch;
+    background:var(--paper);
+  }
+  .cd-main{display:block}
+  .cd-stage{height:var(--cd-h);flex:none}
+  .cd-side{
+    border-left:0;border-top:1px solid var(--line);
+    overflow:visible;padding:18px 18px 30px;
+  }
+  .cd-bar{flex-wrap:wrap;gap:10px 14px}
+  .cd-ten-tr{width:130px}
+  .cd-cue{white-space:normal}
+}
+
+@media (max-width:560px){
+  .cd-h{font-size:23px}
+  .cd-ten-tr{width:104px}
+  .cd-ten-s{min-width:64px;font-size:11.5px}
+  .cd-tx{grid-template-columns:62px minmax(0,1fr)}
+  .cd-tx-svg{width:62px;height:104px}
+}
+
+/* Reduced motion: the drill IS the movement, so nothing here stops. What goes
+   is the camera's easing — it chases on a lag that reads as drift to anyone
+   who asked for less of it, and snapping the camera costs the drill nothing. */
+@media (prefers-reduced-motion:reduce){
+  .cd-learn-f{transition:none}
+  .cd-ten-f{transition:none}
+}
+
+/* The stage chrome belongs to a turntable. Tab 05 drives the camera itself, so
+   the reset button and the "drag to turn" hint would both be instructions that
+   do nothing. condition.js marks its host .st-drive; app.js needs to know
+   nothing about it. */
+.st.st-drive .st-btn,
+.st.st-drive .st-hint{display:none}
+
+/* .cd-side is a flex column with its own scroller, and flex children shrink by
+   default — which let the transmitter ride up over the last line of the coach
+   note. Nothing in this column may shrink; it scrolls instead. */
+.cd-side > *{flex:0 0 auto}

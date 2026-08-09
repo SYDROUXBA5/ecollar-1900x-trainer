@@ -41,8 +41,12 @@ assert n == 1, 'stylesheet link not found'
 # before app.js and they find no EC, return quietly, register nothing, and you
 # get a page with no console error and three dead tabs. So they go last.
 # EC_INLINED tells ensureModule() not to fetch files that are not there.
-PRELUDE  = ['models-receiver.js', 'models-transmitter.js', 'models-dog.js']
-POSTLUDE = ['nomen.js', 'fitting.js', 'level.js']
+# field-tex.js belongs in the PRELUDE for the same reason the meshes do: it is
+# a plain string global, and condition.js checks for window.FIELD_TEX before it
+# tries to inject the file — which in a one-file build is not there to inject.
+PRELUDE  = ['models-receiver.js', 'models-transmitter.js', 'models-dog.js',
+            'models-trainer.js', 'field-tex.js']
+POSTLUDE = ['nomen.js', 'fitting.js', 'level.js', 'condition.js']
 
 def inline(path):
     body = read(path)

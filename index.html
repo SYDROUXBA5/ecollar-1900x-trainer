@@ -154,6 +154,21 @@
       <span class="tl">Working level</span>
     </button>
 
+    <button class="tab" type="button" role="tab" id="tab-condition"
+            data-tab="condition" aria-controls="pane-condition" aria-selected="false" tabindex="-1">
+      <!-- A handler, a dog, and a line between them with the sag still in it.
+           The whole drill is whether that line is loaded or slack, so that is
+           what the icon draws. -->
+      <svg class="ti" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+        <circle cx="4.3" cy="5.6" r="1.7"/>
+        <path d="M4.3 8.1v4.1"/>
+        <path d="M6 15.9a6.4 6.4 0 0 1 8.6-4.3"/>
+        <circle cx="15.7" cy="12.9" r="1.9"/>
+      </svg>
+      <span class="tk" aria-hidden="true">05</span>
+      <span class="tl">Collar conditioning</span>
+    </button>
+
   </div>
 
   <!-- ── shown only when the browser cannot draw 3D ────────────────────── -->
@@ -169,6 +184,7 @@
     <section class="pane" id="pane-transmitter" role="tabpanel" aria-labelledby="tab-transmitter" tabindex="-1" hidden></section>
     <section class="pane" id="pane-fit" role="tabpanel" aria-labelledby="tab-fit" tabindex="-1" hidden></section>
     <section class="pane" id="pane-level" role="tabpanel" aria-labelledby="tab-level" tabindex="-1" hidden></section>
+    <section class="pane" id="pane-condition" role="tabpanel" aria-labelledby="tab-condition" tabindex="-1" hidden></section>
 
   </main>
 </div>
@@ -181,5 +197,9 @@
 <script src="vendor/TrackballControls.js"></script>
 <script src="parts.js"></script>
 <script src="app.js"></script>
+<!-- condition.js is NOT listed here. Like nomen.js, fitting.js and level.js it
+     is injected by app.js the first time its tab is opened, so a student who
+     never reaches tab 05 never pays for it. -->
+
 </body>
 </html>

@@ -19,10 +19,10 @@ not a broken picture. It was also checked on a phone-width window (414 px
 across): nothing spills off the side and both drills can be completed there,
 with 3D and without.
 
-There are four tabs across the top. The app only loads what you open — starting
+There are five tabs across the top. The app only loads what you open — starting
 it costs you the receiver model and nothing else.
 
-## The four tabs
+## The five tabs
 
 **1 · Receiver nomenclature.** The box that goes on the dog, turnable, with the
 parts named and each name carrying the manual page it came from.
@@ -77,6 +77,69 @@ straight to tab 4 without ever opening tab 3. The strap lands in an identical
 position either way. It used to not — tab 4 stood the dog in a collar that tab 3
 marked down as a failure — and the two tabs taught opposite things about the
 same collar on the same dog.
+
+**5 · Collar conditioning.** The first four tabs are about the equipment. This
+one is about the timing, and it is the only tab where the dog moves.
+
+You are in a field with her on a line. Walk away — W and S move in and out, A
+and D arc left and right — and she does not come with you, so the line takes up
+and goes tight. Tap the nick (space, or the transmitter in the panel) the moment
+it loads, keep tapping for as long as it stays tight — one, two, three, four —
+and stop the instant it goes slack. Then change direction and do it again.
+
+What is being marked is the **stopping**, because that is what teaches: this is
+negative reinforcement, and the behaviour grows because something the dog wants
+to end, ends. She learns from the tapping ending, not from any single tap — a
+nick is over before she can respond to it, so there is no release for her to
+time and none is marked. Each rep is graded on how quickly the first tap
+followed the line loading, whether the taps kept coming while it stayed tight,
+and above all on **overrun**: taps that land after the line has already dropped.
+Four faults are called by name —
+
+- a tap on a **slack line**, which corrects her for already being right;
+- **one tap too many**, landing at the exact moment she got it right;
+- **going quiet** mid-rep with the line still loaded, which takes the pressure
+  off for nothing she did;
+- **tapping too fast**, because taps stacked on each other are one long buzz
+  rather than four pieces of information.
+
+The line, not the dog, is the thing to watch: it is readable from anywhere in
+the field, and by the time you have finished reading the dog you are two taps
+late.
+
+She learns. Understanding is a real number that grows from well-timed reps and
+falls from the faults above, and it changes her behaviour: at the start
+she leaves you within a second and braces against the line, and by the end she
+checks in and turns before the line has loaded at all. Five stages take her from
+an open field to changes of direction, a distraction, a six-metre long line and
+finally off the line altogether, which is the whole object of the exercise.
+
+The handler and the ground under him were generated for this app rather than
+modelled by hand: a reference photograph, converted to a mesh, and a
+photographed turf texture. Both are vendored into this folder like everything
+else, so the "Works offline" badge in the header still means what it says —
+nothing on tab 5 reaches the network either.
+
+Worth knowing if you regenerate them. Rigging was requested and paid for twice
+and came back with `skins: 0` both times, once through the image-to-3D model's
+own `enable_rigging` flag and once through the dedicated rigging model, which
+failed outright. So the handler's walk is rigged here in `condition.js`, the
+same way the dog's is. His trouser legs also came back **fused into a single
+column** — a flood fill below the hips returns one component, not two — so his
+legs are separated by which side of his centreline a vertex falls on, with the
+weight fading to nothing at the join so the fused part stays put while the
+outsides of both legs swing.
+
+The level dial is there, and climbing it is answered in the coaching rather than
+in the marking — a dog that has not understood the question does not need a
+bigger one.
+
+Note that the twelve-second Constant cut-out (p.3) is **not** modelled on this
+tab, and should not be: that is the Constant button's safety feature, and this
+drill does not hold Constant. Holding the key down here does nothing after the
+first press, and the keyboard's own auto-repeat is deliberately ignored — it
+would tap about fifteen times a second and the drill would be marking the
+operating system's rhythm instead of the student's.
 
 ---
 

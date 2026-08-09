@@ -1,7 +1,7 @@
 {
-  "updated": "done \u2014 all six pieces through, four fixes landed after the final pass",
-  "headline": "Built and verified. One falsehood survived four rounds by hiding in a second file \u2014 it is gone now.",
-  "note": "The final whole-app pass confirmed both drills complete at 1440 and 414, the two tabs agree, and every hard gate holds in one session. It found the longer-posts claim still alive in parts.js, which I had missed by grepping three files and not the fourth. Fixed, plus the jaw-boundary copy, the band-bottom wording and a stale comment that would have re-created the bug.",
+  "updated": "section plate rebuilt; fixing a shear that only shows in a demo",
+  "headline": "The plate is real anatomy now \u2014 and the critic found a fault that only appears where you would demo it",
+  "note": "Verified still true, anatomy reads, all gates pass, and zero overflow across ~15,600 swept states. Not called premium yet: above height 69 the crest structure shears off the midline, and the teaching band itself is clean \u2014 so it is invisible in normal use and fatal the moment someone drags the slider to the top.",
   "gates": [
     {
       "name": "Console clean",
@@ -82,6 +82,15 @@
       "round": 2,
       "critic": "Verified over six full runs with the log placed beside the verdict, three of them deliberate misses at threshold. Every factual claim traceable to a log line.",
       "gap": "Closed. The hidden threshold is now revealed separately and labelled, instead of being asserted as something the student saw."
+    },
+    {
+      "id": "section",
+      "name": "Cross-section panel",
+      "sub": "premium anatomical plate, still live",
+      "state": "rework",
+      "round": 4,
+      "critic": "R3: still true, anatomy reads, all gates pass, worst overflow 0px across ~15,600 states. Not premium yet.",
+      "gap": "Above h69 the nuchal ligament walks 10.3 units off the midline and GROWS 52% while the neck narrows 8% \u2014 the only structure getting bigger as the section shrinks. On screen it tilts 25-30 degrees onto the muscle belly."
     }
   ],
   "log": [
@@ -132,6 +141,15 @@
     "Fixed it, and verified in the browser this time rather than by grep: tab 1 now carries the p.43 clip-the-hair remedy and states no longer pair is in the box.",
     "Moved the \"round the jaw\" boundary from 62 to 66 \u2014 the verifier proved 61 and 62 are photographically the same picture, so the old boundary called a strap on the neck a strap on the jaw.",
     "Verified live: 42-51 \"clear of the shoulder\", 52-56 \"behind the ears\", 57-65 \"riding up onto the head\", 66+ \"round the jaw\". Console: no logs at all.",
-    "Rewrote a stale comment that told the next developer level.js carries its own copy of the fit numbers \u2014 following it would have re-created the bug that made the two drills contradict each other."
+    "Rewrote a stale comment that told the next developer level.js carries its own copy of the fit numbers \u2014 following it would have re-created the bug that made the two drills contradict each other.",
+    "You flagged the cross-section as not looking premium or real. Agreed \u2014 the neck interior was an abstract blob with a \"+\" and a circle, and \"coat parted skin\" was colliding with the panel edge.",
+    "Used Higgsfield to generate a veterinary-grade anatomy plate as the structural reference \u2014 correct placement of trachea, oesophagus, vertebra, spinal cord, carotid sheaths and nuchal ligament.",
+    "Deliberately NOT embedding that image: the neck outline changes shape with height, so a fixed picture would stop matching the moment a student moved a slider. The anatomy gets hand-drawn as vector paths that scale with the measurement.",
+    "The windpipe now has to read at a glance, because the manual target is \"one contact either side of the windpipe\" and a student has to see that the posts are beside it, not on it.",
+    "Cross-section rebuilt as a real plate: vertebra with its canal, muscle bellies with fibre striations, carotid sheaths, windpipe with cartilage, coat as actual hair, skin as its own layer \u2014 all scaled to the live measured outline.",
+    "The overflow bug is fixed at the cause: every string is now measured with getBBox() after it is set, instead of guessing widths from character counts. Critic swept ~15,600 states and measured zero clipped glyphs.",
+    "Panel A now reads as a section rather than a bar chart, with the shortfall marked as a dimensioned 27% the way an engineering drawing marks one.",
+    "The blunt copy survived the polish \u2014 \"Points stop in the coat\" and \"Never touched\" are untouched. That was the main risk in making it prettier.",
+    "Critic caught a shear above h69 that is invisible in the 4/4 teaching band but breaks the \"measured off your dog\" claim in one drag. Being fixed, along with demoting the label typography so the drawing outranks its labels."
   ]
 }

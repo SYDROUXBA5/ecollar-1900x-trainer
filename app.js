@@ -36,7 +36,7 @@
 (function () {
   'use strict';
 
-  var TABS = ['receiver', 'transmitter', 'fit', 'level'];
+  var TABS = ['receiver', 'transmitter', 'fit', 'level', 'condition'];
   var SVGNS = 'http://www.w3.org/2000/svg';
 
   /* Which script owns which tab. Injected on first entry to that tab; a tab
@@ -46,26 +46,30 @@
     receiver:    'nomen.js',
     transmitter: 'nomen.js',
     fit:         'fitting.js',
-    level:       'level.js'
+    level:       'level.js',
+    condition:   'condition.js'
   };
 
   var MESH_FILE = {
     receiver:    'receiver.glb',
     transmitter: 'transmitter.glb',
-    dog:         'dog.glb'
+    dog:         'dog.glb',
+    trainer:     'trainer.glb'
   };
 
   var MESH_NAME = {
     receiver:    'receiver',
     transmitter: 'transmitter',
-    dog:         'dog'
+    dog:         'dog',
+    trainer:     'handler'
   };
 
   var TITLE = {
     receiver:    'Receiver',
     transmitter: 'Transmitter',
     fit:         'Fit the collar',
-    level:       'Find the working level'
+    level:       'Find the working level',
+    condition:   'Collar conditioning'
   };
 
   // ── tiny helpers ────────────────────────────────────────────────────────
@@ -262,7 +266,8 @@
   var EMBEDDED = {
     receiver:    { src: 'models-receiver.js',    key: 'MODEL_RECEIVER' },
     transmitter: { src: 'models-transmitter.js', key: 'MODEL_TRANSMITTER' },
-    dog:         { src: 'models-dog.js',         key: 'DOGMODEL' }
+    dog:         { src: 'models-dog.js',         key: 'DOGMODEL' },
+    trainer:     { src: 'models-trainer.js',     key: 'MODEL_TRAINER' }
   };
 
   var scriptOnce = {};
@@ -2532,7 +2537,7 @@
          'you touch the dial. Turning the level up is the wrong answer to a strap that has slipped.']
       ]);
 
-    } else {
+    } else if (tab === 'level') {
       root.appendChild(refTop(tab, 'Find the working level',
         'The lowest level the dog will tell you it noticed'));
 
@@ -2560,6 +2565,40 @@
          '. The manual never uses those words: it says “the right stimulation level” and ' +
          '“a mild response”. Same thing. Know both, so the manual’s wording does not catch you out.']
       ]);
+
+    } else {
+      root.appendChild(refTop(tab, 'Collar conditioning',
+        'Teaching the dog that coming to you is what turns the pressure off'));
+
+      cards(colA, 'The loop', [
+        ['Load the line',
+         'Walk away — back, left, right. The dog does not come with you, so the line takes up and goes tight. That tension is the question you have just asked her.'],
+        ['Start tapping the moment it loads',
+         'The instant the line is tight, tap the nick at her working level. One tap. Not before it loads: a slack line with the collar going is a correction for being right, and that is where a dog learns the collar is weather rather than information.'],
+        ['Keep tapping while it stays tight',
+         'One, two, three, four. For as long as the line is loaded, the taps keep coming. Going quiet halfway through takes the pressure off for nothing she did, which teaches the same wrong thing as stopping too late — only earlier.'],
+        ['Stop the instant it goes slack',
+         'She turns, she steps in, the line drops — your thumb stops. That is the whole lesson. She is not learning from the taps; she is learning from the tapping ENDING.'],
+        ['Again, in a different direction',
+         'Change direction and repeat. She is not learning a route; she is learning that a slack line and being with you are the same thing.']
+      ]);
+
+      section(colB, 'Why the stopping is the teacher', [
+        ['This is negative reinforcement: a behaviour grows because something the dog wants to end, ends. ',
+         { s: 'The stimulation is not the lesson — it stopping is.' },
+         ' A handler who taps at the right moment and carries on tapping at the wrong one has taught nothing, and has spent the dog’s patience doing it.'],
+        ['Which is why the thing to watch is the ', { s: 'line' }, ', not the dog. The line going slack is your signal to stop, ' +
+         'and it is readable from anywhere in the field. By the time you have finished reading the dog, you are two taps late.']
+      ]);
+
+      section(colB, 'The three ways students get this wrong', [
+        [{ s: 'Tapping on a slack line.' }, ' She was already right, and that tap corrected her for it. ' +
+         'Nothing about the collar makes sense to a dog this happens to twice.'],
+        [{ s: 'One more tap after the line drops.' }, ' It lands at the exact moment she got it right. ' +
+         'Often enough and what she learns is that coming to you is not the thing that stops it, which is the exercise upside down.'],
+        [{ s: 'Climbing the dial instead of tapping.' }, ' A dog that has not understood yet is not a dog that needs more level. ' +
+         'Turning it up gets you a bigger reaction to a question she still cannot read — see ', { s: 'tab 04' }, '.']
+      ], 'Fit first (tab 03), working level second (tab 04), and only then this. A collar that has slipped, or a level found in a quiet yard and never re-checked, will fail here and look like a dog that will not learn.');
     }
 
     root.appendChild(body);
@@ -2567,7 +2606,8 @@
   }
 
   function buildRef(tab) {
-    return (tab === 'fit' || tab === 'level') ? drillRef(tab) : nomenRef(tab);
+    return (tab === 'fit' || tab === 'level' || tab === 'condition')
+      ? drillRef(tab) : nomenRef(tab);
   }
 
   function renderRef() {
@@ -2613,8 +2653,8 @@
   }
 
   // ── routing ─────────────────────────────────────────────────────────────
-  var enterHooks = { receiver: [], transmitter: [], fit: [], level: [] };
-  var leaveHooks = { receiver: [], transmitter: [], fit: [], level: [] };
+  var enterHooks = { receiver: [], transmitter: [], fit: [], level: [], condition: [] };
+  var leaveHooks = { receiver: [], transmitter: [], fit: [], level: [], condition: [] };
   var entered     = {};
   var claimed     = {};
   var current     = null;
