@@ -1,7 +1,6 @@
 # Dogtra 1900X — collar trainer
 
-A teaching app for the Dogtra 1900X, written for Highland Canine Training
-students. It runs on one machine, on its own, with nothing switched on but the
+A teaching app for the Dogtra 1900X, written for training students. It runs on one machine, on its own, with nothing switched on but the
 laptop.
 
 ## Opening it
@@ -148,7 +147,7 @@ operating system's rhythm instead of the student's.
 You asked for this specifically, so it gets its own section. The source of
 record is the *1900X 1-DOG UNIT Owner's Manual* (Dogtra, 48 pages, downloaded
 from dogtra.com). Where your course slides say something different, both are
-below, named. Where the app teaches something that is neither — Highland Canine
+below, named. Where the app teaches something that is neither — course
 doctrine — that is said too.
 
 **The dial goes to 100, not 127.** Manual p.7. Any slide showing 0–127 is the
@@ -167,7 +166,7 @@ selector*. The manual (p.8) calls it the **Receiver Selector Toggle (Up to
 the course phrase as an alias so you still find it if you search for it. If an
 examiner asks, you now know both.
 
-**"Working level" is not the manual's phrase.** Highland Canine teaches *working
+**"Working level" is not the manual's phrase.** The course teaches *working
 level* and *recognition level*. The manual (p.31) says *"the right stimulation
 level"*, and describes what you are looking for as *"a mild response"*. The app
 uses the course vocabulary, because that is what you will be examined on, and
@@ -180,8 +179,8 @@ Everything finer than that in tab 4 is training doctrine, not manufacturer
 instruction, and the app marks which is which. The manual does contribute some
 of the signs itself (p.43): neck movement, head shaking, looking over the
 shoulder, and a warning that the response may be very subtle. Those are cited to
-Dogtra. Ear flick, glance away, never a yelp and never a flinch are Highland
-Canine's and are marked as Highland Canine's.
+Dogtra. Ear flick, glance away, never a yelp and never a flinch are course
+doctrine and are marked as course doctrine.
 
 **Thick coat: Dogtra's remedy is to clip the hair, not to fit longer posts.**
 This is the important one. The troubleshooting entry "My dog is not reacting to

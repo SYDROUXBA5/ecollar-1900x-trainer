@@ -1,5 +1,5 @@
 /* ============================================================================
-   DOGTRA 1900X · Highland Canine Training
+   DOGTRA 1900X · collar trainer
    SHELL — boot, WebGL probe, tab routing, offline mesh loader, the shared 3D
    stage every module draws into, and the written reference that stands in for
    all of it when 3D is unavailable.
@@ -2556,12 +2556,12 @@
          'of those, you are far past the working level — come down and start again.'],
         ['If you see nothing at all after several levels, stop climbing and check the collar. ' +
          'A strap that has gone loose reads exactly like a dog that has not felt anything.']
-      ], 'The manual’s whole procedure is three sentences (p.31). Everything finer-grained here is Highland Canine’s teaching, not manufacturer instruction.');
+      ], 'The manual’s whole procedure is three sentences (p.31). Everything finer-grained here is course doctrine, not manufacturer instruction.');
 
       section(colB, 'Two things students get caught out on', [
         ['This unit has ', { s: '100 levels, 0–100' }, '. Any slide showing 0–127 is the older ' +
          '1900S — a different generation, with a Nick/Constant toggle switch. Wrong machine.'],
-        ['Highland Canine says ', { s: 'working level' }, ' and ', { s: 'recognition level' },
+        ['The course says ', { s: 'working level' }, ' and ', { s: 'recognition level' },
          '. The manual never uses those words: it says “the right stimulation level” and ' +
          '“a mild response”. Same thing. Know both, so the manual’s wording does not catch you out.']
       ]);

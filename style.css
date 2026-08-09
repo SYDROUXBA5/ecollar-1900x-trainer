@@ -1,5 +1,5 @@
 /* ============================================================================
-   DOGTRA 1900X · Highland Canine Training — shell stylesheet
+   DOGTRA 1900X · collar trainer — shell stylesheet
    Owner: SHELL. Module rules live here too (contract), added as they land.
 
    ── PALETTE, AND WHY IT CHANGED ────────────────────────────────────────────
@@ -2017,7 +2017,7 @@ ol,ul{padding:0;list-style:none}
 .lv-reveal.bad .lv-revg{color:var(--lv-bad)}
 
 /* Provenance marks in "what a mild response looks like". The manual's own
-   words and Highland Canine's doctrine must never be mistaken for each other,
+   words and course doctrine must never be mistaken for each other,
    so they are marked per item and they do not share a colour. */
 .lv-tag{
   flex:0 0 auto;font-style:normal;font-size:9.5px;font-weight:700;

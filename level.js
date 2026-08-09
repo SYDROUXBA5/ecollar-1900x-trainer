@@ -1,5 +1,5 @@
 /* ============================================================================
-   TAB 04 · FIND THE WORKING LEVEL — Highland Canine Training
+   TAB 04 · FIND THE WORKING LEVEL
    Owner of this file: LEVEL. It owns level.js and its own block at the foot of
    style.css. Nothing else.
 
@@ -36,7 +36,7 @@
    learns to watch for a blink that this app invented has learned the wrong
    thing.
 
-   VOCABULARY (discrepancy D6). Highland Canine says "working level"; the manual
+   VOCABULARY (discrepancy D6). The course says "working level"; the manual
    (p.31) says "the right stimulation level" and "a mild response". The course
    words are what the student is examined on, so they are what the UI uses — and
    the manual's own phrase is stated once, under the heading, so nobody is
@@ -1317,7 +1317,7 @@
     var d6 = el('p', 'lv-d6');
     d6.appendChild(el('b', null, 'On the wording: '));
     d6.appendChild(document.createTextNode(
-      'Highland Canine says working level. The manual never uses that phrase — it says “the right stimulation level” and “a mild response” (p.31). Same thing; know both.'));
+      'The course says working level. The manual never uses that phrase — it says “the right stimulation level” and “a mild response” (p.31). Same thing; know both.'));
     head.appendChild(d6);
     side.appendChild(head);
 
@@ -1412,7 +1412,7 @@
     /* SOURCING IS PER LINE, and it is not decoration. MANUAL-FACTS §4c: the
        manual (p.43) names neck movement, head shaking and looking over the
        shoulder as the response to climb toward, and warns it may be very
-       subtle. It names none of the five below — those are Highland Canine's.
+       subtle. It names none of the five below — those are course doctrine.
        A student who cites an ear flick to Dogtra in an exam is marked down for
        it, so the two are kept apart on the face of the tab, item by item. */
     function signList(items) {
@@ -1422,7 +1422,7 @@
         li.appendChild(el('b', null, r[0]));
         li.appendChild(el('span', null, r[1]));
         li.appendChild(el('i', 'lv-tag lv-tag-' + r[2],
-          r[2] === 'm' ? 'manual p.43' : 'Highland Canine'));
+          r[2] === 'm' ? 'manual p.43' : 'course doctrine'));
         ul.appendChild(li);
       });
       return ul;
@@ -1448,7 +1448,7 @@
     var p1 = el('p', 'lv-wp');
     p1.appendChild(el('b', null, 'Past it. '));
     p1.appendChild(document.createTextNode(
-      'The manual’s three are real responses — but they are what a response looks like once you are already above the level you wanted. Highland Canine has you stop short of them.'));
+      'The manual’s three are real responses — but they are what a response looks like once you are already above the level you wanted. The course has you stop short of them.'));
     wb.appendChild(p1);
 
     wb.appendChild(signList([
@@ -1471,7 +1471,7 @@
     wb.appendChild(p3);
 
     watch.appendChild(el('p', 'lv-src',
-      'Sourcing. The procedure is the manual’s (p.31): start low, work up, stop at a mild response, expect to adjust. The three signs marked manual p.43 are the manual’s own words, as is its warning that the response may be very subtle. Everything marked Highland Canine — the ear flick, the twitch, the ears back, the glance, the head dip, and never a yelp and never a flinch — is course doctrine, not manufacturer instruction. Do not cite it as if it were.'));
+      'Sourcing. The procedure is the manual’s (p.31): start low, work up, stop at a mild response, expect to adjust. The three signs marked manual p.43 are the manual’s own words, as is its warning that the response may be very subtle. Everything marked course doctrine — the ear flick, the twitch, the ears back, the glance, the head dip, and never a yelp and never a flinch — is the school’s teaching, not manufacturer instruction. Do not cite it as if it were.'));
     side.appendChild(watch);
     ui.watchBtn = wh; ui.watchBody = wb;
 

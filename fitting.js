@@ -1,5 +1,5 @@
 /* ============================================================================
-   TAB 3 · FIT THE COLLAR — Highland Canine Training
+   TAB 3 · FIT THE COLLAR
    Owner of this file: FIT. Nothing else in the app may write here.
 
    Nomenclature teaches what the parts are called. This teaches the thing that
@@ -39,8 +39,8 @@
    do unscrew and students will be told about them — but it is marked as a
    part the student may not own, and never as manufacturer instruction.
 
-   The manual gives NO height on the neck. Decision 1 is Highland Canine's
-   doctrine and every screen that carries it says so.
+   The manual gives NO height on the neck. Decision 1 is course doctrine and
+   every screen that carries it says so.
 
    ── THE NECK FRAME IS MEASURED, NOT GUESSED ────────────────────────────────
    Lifted verbatim from the previous build (~/Desktop/E-COLLAR-3D/fitting.js),
@@ -232,7 +232,7 @@ var GROOM = [
     src: '' },
   { id: 'part', name: 'Part the coat',
     note: 'Separate the hair under each point with your fingers before you buckle up. Costs nothing, and it is the check you should be doing on every dog anyway.',
-    src: 'Highland Canine' },
+    src: 'Course doctrine' },
   { id: 'clip', name: 'Clip the neck',
     note: 'Take the hair down at the two contact spots. Dogtra p.43: trim down the hair on the dog’s neck so both contact points are touching the skin.',
     src: 'Manual p.43' },
@@ -2860,7 +2860,7 @@ function updateSection() {
 /* Every row is: what you did, and what it COSTS. A tick and a cross tell a
    student they were wrong; they do not tell them why anybody cares.
    Every row also says WHOSE rule it is. Two of the four are Dogtra's own
-   words; two are Highland Canine's teaching, and a student who cannot tell
+   words; two are course doctrine, and a student who cannot tell
    them apart will be caught out by an examiner holding the manual. */
 function grade() {
   var rows = [], vc = vClock(), vt = vTension(), vco = vCoat();
@@ -2868,33 +2868,33 @@ function grade() {
 
   var hb = hBand();
   rows.push(hb === 'ok'
-    ? { k: 'Height on the neck', src: 'Highland Canine', v: 'ok',
+    ? { k: 'Height on the neck', src: 'Course doctrine', v: 'ok',
         was: 'High on the neck, behind the ears.',
         say: 'The neck is narrowest here and the skin is thinnest, so the points sit where they can reach it. It is also the one place a strap will not walk to somewhere worse. The manual sets no height — this one is ours.' }
     : hb === 'high'
-      ? { k: 'Height on the neck', src: 'Highland Canine', v: 'no',
+      ? { k: 'Height on the neck', src: 'Course doctrine', v: 'no',
           was: 'Past the neck — up on the jaw.',
           say: 'Behind the ears is the TOP of the neck, not the head. Look at the dog: the strap is across the cheek and the box is under the chin. There is no collar on that neck.',
           cost: 'The strap has nothing to sit on. The skull is wider than the neck, so it drops the moment the dog moves, and until it does the points are on jaw muscle and bone — nowhere near the skin beside the windpipe. Come back down until the strap is tucked up under the jaw and sitting on neck.' }
     : hb === 'mid'
-      ? { k: 'Height on the neck', src: 'Highland Canine', v: 'near', was: 'Mid-neck.',
+      ? { k: 'Height on the neck', src: 'Course doctrine', v: 'near', was: 'Mid-neck.',
           say: 'It works this minute.',
           cost: 'It will not stay there. A collar this low migrates down onto the shoulder over a session, a few millimetres at a time, and you will not see it happen — you will see a dog that has stopped answering.' }
-      : { k: 'Height on the neck', src: 'Highland Canine', v: 'no', was: 'Down on the shoulder.',
+      : { k: 'Height on the neck', src: 'Course doctrine', v: 'no', was: 'Down on the shoulder.',
           say: 'The neck is at its thickest here and the points are on muscle and coat, not skin.',
           cost: 'The dog stops answering, so the handler winds the dial up. Then the collar shifts back up the neck at a shake and the level you built on a dog that could not feel it lands all at once.' });
 
   rows.push(vc === 'ok'
     ? { k: 'Position round the neck', src: 'Manual p.27', v: 'ok',
         was: clockLabel(set.clock) + ' — beside the windpipe.',
-        say: 'Dogtra says one thing about location and you are on it: the best location is on either side of the dog’s windpipe (p.27). Staying off the crest as well is Highland Canine’s addition, not the manual’s.' }
+        say: 'Dogtra says one thing about location and you are on it: the best location is on either side of the dog’s windpipe (p.27). Staying off the crest as well is course doctrine, not the manual’s.' }
     : (d > Z_PIPE[0] && d < Z_PIPE[1])
       ? { k: 'Position round the neck', src: 'Manual p.27', v: 'no',
           was: clockLabel(set.clock) + ' — on the windpipe.',
           say: 'Never here. The housing is sitting on the trachea, and the manual puts it beside the windpipe, not under it.',
           cost: 'A dog that hits the end of a lead is hurt by the collar before any stimulation is involved. It will cough, then it will start fighting the collar, and you will spend a week undoing that.' }
       : inBands(d, Z_CREST)
-        ? { k: 'Position round the neck', src: 'Highland Canine', v: 'no',
+        ? { k: 'Position round the neck', src: 'Course doctrine', v: 'no',
             was: clockLabel(set.clock) + ' — on top of the neck.',
             say: 'The crest is thick muscle under the heaviest coat on the dog. The manual does not name the crest; this one is ours, and it is about whether the points can reach skin at all.',
             cost: 'The points cannot get near skin, and a box up here has nothing to sit against — it rolls to one side the first time the dog shakes, and then you have no idea where it is.' }
@@ -3076,7 +3076,7 @@ function buildUI(pane) {
      counted the height decision as manufacturer instruction. The manual gives
      no height at all. */
   head.appendChild(el('p', 'fit-s',
-    'Four decisions. Two are Dogtra’s own words — two fingers under the strap, and beside the windpipe (p.27). Where on the neck is Highland Canine’s: the manual sets no height. The fourth is how you actually meet the manual’s first target, points on skin.'));
+    'Four decisions. Two are Dogtra’s own words — two fingers under the strap, and beside the windpipe (p.27). Where on the neck is course doctrine: the manual sets no height. The fourth is how you actually meet the manual’s first target, points on skin.'));
   inner.appendChild(head);
 
   // the dog today
@@ -3109,7 +3109,7 @@ function buildUI(pane) {
   var ol = el('ol', 'fit-decs');
 
   var d1 = decision(1, 'Height on the neck', 'shoulder → behind the ears',
-    { t: 'Highland Canine doctrine. The manual gives no height.', man: false });
+    { t: 'Course doctrine. The manual gives no height.', man: false });
   ui.f1 = d1.flag;
   ui.r1 = slider('fitHeight', 0, 100, Math.round(set.height * 100),
     'Height on the neck, 0 at the shoulder to 100 behind the ears', function (e) {

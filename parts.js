@@ -1,6 +1,6 @@
 /* ============================================================================
    DOGTRA 1900X — PART NOMENCLATURE
-   Highland Canine Training · student reference
+   Student reference
 
    Unit of record: "1900X · 1-DOG UNIT · 126072", read from the unit's own rear
    label (owner's photographs IMG_4200–4213).
