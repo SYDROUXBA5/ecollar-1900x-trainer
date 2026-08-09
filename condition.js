@@ -66,18 +66,45 @@
 
     /* joint = where the limb meets the body and the weight must be 0.
        knee   = the second joint, halfway down. Front and hind differ. */
+    /* ph is the TROT: diagonal pairs, front-left with hind-right, two beats.
+       phW is the WALK: a four-beat lateral sequence, each foot a quarter of a
+       cycle after the last. She blends between them with speed, because a dog
+       asked to move slowly walks — she does not trot in slow motion, and a
+       slow-motion trot is one of those things that looks wrong without anyone
+       being able to say why. */
     legs: [
-      { id: 'fl', f:  0.205, s: -0.039, fore: 1, ph: 0.00 },
-      { id: 'fr', f:  0.184, s: -0.204, fore: 1, ph: 0.50 },
-      { id: 'hl', f: -0.322, s:  0.081, fore: 0, ph: 0.50 },
-      { id: 'hr', f: -0.385, s: -0.140, fore: 0, ph: 0.00 }
+      { id: 'fl', f:  0.205, s: -0.039, fore: 1, ph: 0.00, phW: 0.00 },
+      { id: 'fr', f:  0.184, s: -0.204, fore: 1, ph: 0.50, phW: 0.50 },
+      { id: 'hl', f: -0.322, s:  0.081, fore: 0, ph: 0.50, phW: 0.75 },
+      { id: 'hr', f: -0.385, s: -0.140, fore: 0, ph: 0.00, phW: 0.25 }
     ],
     jointY: { fore: -0.020, hind: -0.045 },
     kneeY:  { fore: -0.235, hind: -0.215 },
     legR:   0.092,                 // capture radius about a leg's own axis
 
     // the tail: behind the hindquarters, hanging to hock height, on her left
-    tail:   { f: -0.487, s: 0.112, baseY: 0.020, tipY: -0.265, r: 0.130 }
+    tail:   { f: -0.487, s: 0.112, baseY: 0.020, tipY: -0.265, r: 0.130 },
+
+    /* The spine. A dog turning is not a car: the hindquarters trail and the
+       forehand leads, so the body carries a curve through the loin. The chest
+       bone pivots here and the weight ramps across the loin — behind `back` a
+       vertex stays with the hips, ahead of `front` it belongs to the forehand.
+       The hind legs sit behind `back` and the front legs ahead of `front`, so
+       neither gets a partial bend. */
+    spine:  { f: -0.100, y: 0.050, back: -0.280, front: 0.100 },
+
+    /* The ears, measured for tab 04 off this same mesh. They are here because
+       an ear flick is what a student is taught to watch for when a stimulation
+       lands — so the tell tab 04 teaches has to actually appear on tab 05.
+       The two carry different axes because this dog's head is turned; a
+       symmetric rig looked wrong on one side. */
+    ears: [
+      { tip:   [-0.1487, 0.4546, 0.4012], axis: [0.0374, 0.8395, 0.5420],
+        pivot: [-0.1510, 0.3806, 0.3710], swing: [0.9976, 0.0000, -0.0688] },
+      { tip:   [-0.0278, 0.4483, 0.3382], axis: [0.5567, 0.7886, 0.2611],
+        pivot: [-0.0594, 0.3758, 0.3234], swing: [0.4246, 0.0000, -0.9054] }
+    ],
+    earFull: -0.055, earZero: -0.100, earReach: 0.062
   };
 
   /* The neck frame is tab 04's, measured off this same mesh by raycasting.
@@ -281,13 +308,15 @@
   //  THE RIG
   // ══════════════════════════════════════════════════════════════════════════
 
-  var FWD, SIDEV, U, ETOP, ESIDEV, BASE, TOPV, baseU, spanU;
+  var FWD, SIDEV, U, ETOP, ESIDEV, BASE, TOPV, baseU, spanU, EAR_SWING;
   function vecs() {
     if (FWD) return;
     FWD = V3(RIG.fwd); SIDEV = V3(RIG.side);
     U = V3(NECK.u); ETOP = V3(NECK.eTop); ESIDEV = V3(NECK.eSide);
     BASE = V3(NECK.base); TOPV = V3(NECK.top);
     baseU = BASE.dot(U); spanU = TOPV.dot(U) - baseU;
+    EAR_SWING = [V3(RIG.ears[0].swing).normalize(),
+                 V3(RIG.ears[1].swing).normalize()];
   }
   // a point from body coordinates: f along the spine, s to her left, y up
   function at(f, s, y) {
@@ -406,15 +435,30 @@
      Bone order: 0 root, 1 head, 2 tail, then per leg upper, lower.
      A vertex takes at most three influences — root, a limb, and that limb's
      second segment — which is inside the four the attribute carries. */
+  /* Bone order, and it is load-bearing — every index below is written by hand:
+       0 root    the hips and the whole rear
+       1 chest   child of root, pivots at the loin so she can BEND when turning
+       2 head    child of chest
+       3 tail    child of root
+       4,5 ears  children of head
+       6..9      front legs, children of CHEST  (fl up/lo, fr up/lo)
+       10..13    hind legs,  children of ROOT   (hl up/lo, hr up/lo)
+
+     Front legs hang off the chest and hind legs off the root on purpose: that
+     is what makes a turn curve the animal instead of skidding a rigid board. */
   function buildWeights(geom) {
     var pos = geom.attributes.position;
     var n = pos.count;
     var si = new Uint16Array(n * 4);
     var sw = new Float32Array(n * 4);
-    var p = new THREE.Vector3();
-    var legs = RIG.legs, i, k;
+    var p = new THREE.Vector3(), d3 = new THREE.Vector3(), q3 = new THREE.Vector3();
+    var legs = RIG.legs, i, k, e;
 
     var tailF = RIG.tail.f, tailS = RIG.tail.s;
+    var ears = [];
+    for (e = 0; e < RIG.ears.length; e++) {
+      ears.push({ tip: V3(RIG.ears[e].tip), ax: V3(RIG.ears[e].axis).normalize() });
+    }
 
     for (i = 0; i < n; i++) {
       p.fromBufferAttribute(pos, i);
@@ -422,14 +466,38 @@
       var s = p.x * SIDEV.x + p.z * SIDEV.z;
       var y = p.y;
       var o = i * 4;
-      si[o] = 0; sw[o] = 1;            // default: rides the body
+
+      /* The default is no longer "the root". The torso is shared between the
+         hips and the forehand so the spine can flex across the loin. */
+      var wChest = smooth(RIG.spine.back, RIG.spine.front, f);
+      si[o] = 0; sw[o] = 1 - wChest;
+      si[o + 1] = 1; sw[o + 1] = wChest;
 
       // the head, along the neck axis — the same ramp tab 04 uses
       var sN = (p.dot(U) - baseU) / spanU;
       var wHead = smooth(HEAD_ZERO, HEAD_FULL, sN);
       if (wHead > 0.002) {
-        sw[o] = 1 - wHead;
-        si[o + 1] = 1; sw[o + 1] = wHead;
+        /* Is it an ear? Measured from the tip down its own axis, and rejected
+           if it sits further than earReach off that axis — that is skull, not
+           ear. The ear bone is a child of the head, so an ear vertex needs no
+           separate head term to follow a head turn. */
+        var bestW = 0, who = -1;
+        for (e = 0; e < ears.length; e++) {
+          d3.set(p.x - ears[e].tip.x, p.y - ears[e].tip.y, p.z - ears[e].tip.z);
+          var alng = d3.dot(ears[e].ax);
+          q3.copy(ears[e].ax).multiplyScalar(alng);
+          if (d3.sub(q3).length() > RIG.earReach) continue;
+          var w = smooth(RIG.earZero, RIG.earFull, alng);
+          if (w > bestW) { bestW = w; who = e; }
+        }
+        if (who >= 0 && bestW > 0.002) {
+          si[o] = 4 + who;  sw[o] = bestW;
+          si[o + 1] = 2;    sw[o + 1] = (1 - bestW) * wHead;
+          si[o + 2] = 1;    sw[o + 2] = (1 - bestW) * (1 - wHead);
+          continue;
+        }
+        si[o] = 2;     sw[o] = wHead;               // head
+        si[o + 1] = 1; sw[o + 1] = 1 - wHead;       // ... blending back to chest
         continue;
       }
 
@@ -439,16 +507,16 @@
          "whichever axis is closer" is the only rule that splits them safely. */
       var bestD = 1e9, bestK = -1;
       for (k = 0; k < legs.length; k++) {
-        var d = Math.hypot(f - legs[k].f, s - legs[k].s);
-        if (d < bestD) { bestD = d; bestK = k; }
+        var dd = Math.hypot(f - legs[k].f, s - legs[k].s);
+        if (dd < bestD) { bestD = dd; bestK = k; }
       }
       var dTail = Math.hypot(f - tailF, s - tailS);
       if (dTail < bestD && y < RIG.tail.baseY) {
         var wT = smooth(RIG.tail.baseY, RIG.tail.tipY, y) *
                  (1 - smooth(RIG.tail.r * 0.70, RIG.tail.r, dTail));
         if (wT > 0.002) {
-          sw[o] = 1 - wT;
-          si[o + 1] = 2; sw[o + 1] = wT;
+          si[o] = 3;     sw[o] = wT;                // tail
+          si[o + 1] = 0; sw[o + 1] = 1 - wT;        // ... back to the hips
         }
         continue;
       }
@@ -466,8 +534,9 @@
       if (wLeg <= 0.002) continue;
       var wKnee = smooth(ky + 0.055, ky - 0.055, y);
 
-      var upper = 3 + bestK * 2, lower = upper + 1;
-      sw[o] = 1 - wLeg;
+      var upper = 6 + bestK * 2, lower = upper + 1;
+      // a front leg falls back to the chest, a hind leg to the hips
+      si[o] = L.fore ? 1 : 0; sw[o] = 1 - wLeg;
       si[o + 1] = upper; sw[o + 1] = wLeg * (1 - wKnee);
       si[o + 2] = lower; sw[o + 2] = wLeg * wKnee;
     }
@@ -477,26 +546,40 @@
 
   function buildSkeleton(geom, mat) {
     var list = [], i;
-    var root = new THREE.Bone();          // 0 — the body
+    var root = new THREE.Bone();                     // 0 — hips and rear
     list.push(root);
 
-    var head = new THREE.Bone();          // 1
-    head.position.copy(centreAt(HEAD_ZERO));
-    root.add(head); list.push(head);
+    var chest = new THREE.Bone();                    // 1 — the forehand
+    chest.position.copy(at(RIG.spine.f, 0, RIG.spine.y));
+    root.add(chest); list.push(chest);
 
-    var tail = new THREE.Bone();          // 2
+    var head = new THREE.Bone();                     // 2
+    head.position.copy(centreAt(HEAD_ZERO)).sub(chest.position);
+    chest.add(head); list.push(head);
+
+    var tail = new THREE.Bone();                     // 3
     tail.position.copy(at(RIG.tail.f, RIG.tail.s, RIG.tail.baseY));
     root.add(tail); list.push(tail);
 
-    for (i = 0; i < RIG.legs.length; i++) {
+    var earB = [];                                   // 4, 5 — children of head
+    for (i = 0; i < RIG.ears.length; i++) {
+      var ear = new THREE.Bone();
+      ear.position.copy(V3(RIG.ears[i].pivot)).sub(centreAt(HEAD_ZERO));
+      head.add(ear); list.push(ear);
+      earB.push(ear);
+    }
+
+    for (i = 0; i < RIG.legs.length; i++) {          // 6..13
       var L = RIG.legs[i];
       var jy = L.fore ? RIG.jointY.fore : RIG.jointY.hind;
       var ky = L.fore ? RIG.kneeY.fore  : RIG.kneeY.hind;
+      var par = L.fore ? chest : root;
       var up = new THREE.Bone();
       up.position.copy(at(L.f, L.s, jy));
-      root.add(up); list.push(up);
+      if (L.fore) up.position.sub(chest.position);   // local to its own parent
+      par.add(up); list.push(up);
       var lo = new THREE.Bone();
-      lo.position.set(0, ky - jy, 0);     // local to its own upper segment
+      lo.position.set(0, ky - jy, 0);
       up.add(lo); list.push(lo);
       boneOf[L.id] = { up: up, lo: lo };
     }
@@ -511,7 +594,8 @@
        moment she starts moving. */
     mesh.frustumCulled = false;
     bones = list;
-    boneOf.root = root; boneOf.head = head; boneOf.tail = tail;
+    boneOf.root = root; boneOf.chest = chest;
+    boneOf.head = head; boneOf.tail = tail; boneOf.ears = earB;
     return mesh;
   }
 
@@ -544,23 +628,29 @@
     var swing = clamp(speed / 2.4, 0, 1);
     var A = 0.34 * swing;                   // radians at the shoulder
     var B = 0.46 * swing;                   // radians at the knee, swing phase only
+
+    /* Walk below about 1 m/s, trot above about 1.6, and blend across the gap.
+       DUTY is the fraction of the cycle a foot spends on the ground: about
+       0.62 at a walk, 0.50 at a trot. That single number is most of what makes
+       a walk look like a walk — at a walk she always has three feet down. */
+    var trotness = smooth(1.05, 1.65, speed);
+    var duty = lerp(0.62, 0.50, trotness);
+
     for (var i = 0; i < RIG.legs.length; i++) {
       var L = RIG.legs[i], b = boneOf[L.id];
-      var p = (phase + L.ph) % 1;
+      var off = lerp(L.phW, L.ph, trotness);
+      var p = (phase + off) % 1;
       var th, fold;
-      if (p < 0.5) {                        // planted
-        th = A * (1 - 2 * (p / 0.5));
+      if (p < duty) {                       // planted
+        th = A * (1 - 2 * (p / duty));
         fold = 0;
       } else {                              // through the air
-        var u = (p - 0.5) / 0.5;
+        var u = (p - duty) / (1 - duty);
         th = -A + 2 * A * (u * u * (3 - 2 * u));
         fold = Math.sin(u * Math.PI) * B;
       }
       /* The hock folds the opposite way to the carpus — a hind leg that bends
-         like a front one is the thing that makes a CG dog look like a table.
-         The SWING direction is not flipped: front-left and hind-right are a
-         diagonal pair and must leave the ground together, which is what makes
-         it a trot rather than a bunny hop. */
+         like a front one is the thing that makes a CG dog look like a table. */
       if (!L.fore) fold = -fold * 0.75;
       b.up.quaternion.setFromAxisAngle(axSide, th);
       b.lo.quaternion.setFromAxisAngle(axSide, -fold);
@@ -574,6 +664,49 @@
     qTmp.setFromAxisAngle(axUp, yaw);
     var q2 = new THREE.Quaternion().setFromAxisAngle(axSide, dip);
     boneOf.head.quaternion.copy(qTmp).multiply(q2);
+  }
+
+  /* The spine, and the lean.
+
+     She used to pivot like a car: one rigid body rotating about its centre.
+     A turning dog carries a curve — the hindquarters trail, the forehand leads
+     — and she banks into it slightly, the way anything that turns at speed
+     does. The chest bone is a child of the hips, so rotating it about the
+     vertical in the SAME direction as the turn puts the front of her ahead of
+     the back of her, which is the curve. */
+  function poseSpine(turnRate, speed, dt) {
+    if (!boneOf.chest) return;
+    var k = 1 - Math.pow(0.004, dt);
+    var want = clamp(turnRate * 0.30, -0.42, 0.42);
+    G.bend = lerp(G.bend || 0, want, k);
+    var lean = clamp(turnRate * speed * 0.055, -0.18, 0.18);
+    G.lean = lerp(G.lean || 0, lean, k);
+    qTmp.setFromAxisAngle(axUp, G.bend);
+    var q2 = new THREE.Quaternion().setFromAxisAngle(FWD, -G.lean);
+    boneOf.chest.quaternion.copy(qTmp).multiply(q2);
+  }
+
+  /* The ears.
+
+     Tab 04 spends its whole length teaching a student to read an ear flick as
+     the sign a stimulation landed. If the ears never move on the tab where the
+     stimulations actually happen, that lesson quietly contradicts itself — so
+     a nick rocks an ear back here, once, and it settles. Negative is backward:
+     each swing axis is cross(up, ear axis) and these ears lean forward of
+     vertical, so a negative angle takes the tip back the way a real one goes. */
+  function poseEars(dt) {
+    if (!boneOf.ears || !boneOf.ears.length) return;
+    var age = G.t - (G.earT == null ? -99 : G.earT);
+    var flick = (age >= 0 && age < 0.55) ? Math.sin((age / 0.55) * Math.PI) : 0;
+    /* Attention sets where they live: forward and up when she is with you,
+       carried back when she is worried or working something out. */
+    var base = (G.dog.state === 'come' || G.dog.state === 'settle')
+      ? 0.05 : -0.10 - 0.16 * G.arousal;
+    for (var i = 0; i < boneOf.ears.length; i++) {
+      var a = base - (i === G.earWhich ? flick * 0.62 : flick * 0.20);
+      var ax = EAR_SWING[i];
+      boneOf.ears[i].quaternion.setFromAxisAngle(ax, a);
+    }
   }
 
   /* Tail. Height carries arousal — clamped down when she is worried, loose and
@@ -1199,7 +1332,10 @@
 
     // turn toward what she wants, at a believable rate
     var dy = ((wantYaw - D.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-    D.yaw += clamp(dy, -3.2 * dt, 3.2 * dt);
+    var applied = clamp(dy, -3.2 * dt, 3.2 * dt);
+    D.yaw += applied;
+    // how hard she is turning, in radians a second — the spine and the head lead read this
+    D.turnRate = applied / Math.max(dt, 1e-4);
 
     D.sp += clamp(target - D.sp, -5 * dt, 3.4 * dt);
     var wasX = D.x, wasZ = D.z;
@@ -1262,6 +1398,12 @@
     var last = G.lastTapT;
     G.lastTapT = G.t;
     G.stimUntil = G.t + TAP.pulse;
+    /* The ear flick. This is the tell tab 04 teaches a student to look for, so
+       it has to happen on the tab where the stimulations are. Which ear moves
+       is the near one more often than not — the collar's receiver sits at 4:30,
+       on that side. */
+    G.earT = G.t;
+    G.earWhich = Math.random() < 0.68 ? 1 : 0;
     paintStim();
 
     if (G.rep && G.rep.open) {
@@ -1594,6 +1736,8 @@
     dogRoot.position.y += bob;
 
     poseLegs(G.gait, G.dog.ground || 0);
+    poseSpine(G.dog.turnRate || 0, G.dog.ground || 0, dt);
+    poseEars(dt);
     poseTail(G.t, G.arousal, G.dog.sp > 0.3);
 
     /* Her head goes where her attention is. When she is coming to you it comes
@@ -1608,7 +1752,14 @@
     } else if (G.dog.state === 'wander') {
       wantDip = 0.30;                    // nose down, reading the ground
     }
-    G.headYaw = lerp(G.headYaw || 0, wantYaw, 1 - Math.pow(0.004, dt));
+    /* The head leads. Nothing that moves turns its body first — the head goes
+       to the corner and the shoulders follow it — so a slice of the turn rate
+       is added here, ahead of the spine bend that trails it. Capped, or a hard
+       direction change screws her neck round past what a neck does. */
+    wantYaw += clamp((G.dog.turnRate || 0) * 0.26, -0.45, 0.45);
+
+    G.headYaw = lerp(G.headYaw || 0, clamp(wantYaw, -1.25, 1.25),
+                     1 - Math.pow(0.004, dt));
     G.headDip = lerp(G.headDip || 0, wantDip, 1 - Math.pow(0.02, dt));
     poseHead(G.headYaw, G.headDip);
 
