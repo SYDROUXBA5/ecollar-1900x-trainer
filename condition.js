@@ -522,23 +522,46 @@
      — which is a trot, and is what a dog moving with a handler actually does.
      Amplitude follows speed, so a standing dog stands still rather than
      marking time on the spot. */
-  function poseLegs(phase, speed, dt) {
-    /* Amplitudes are small on purpose. The first pass ran 31 degrees at the
-       shoulder and 33 at the knee, which at a close camera turned a trot into
-       a stretched gallop and made the upper leg visibly shear — the weight
-       ramp is a skin, not a joint, and it only looks like a joint over a
-       modest angle. A trotting dog's shoulder swings about 18 degrees. */
+  /* STANCE AND SWING, not a sine wave.
+
+     The first version rotated every leg on sin(2*pi*p) and advanced p on a
+     clock. Both halves of that are wrong and together they are why she skated:
+     a sine has the foot moving fastest at mid-stroke, when a planted foot
+     should be travelling backwards at exactly the speed the body travels
+     forward, and a clock-driven phase has no relationship to the ground at all.
+
+     So the cycle is split. For the first half the foot is DOWN and the leg
+     rotates back linearly; because the phase is now driven by distance
+     travelled (see stepDog), that backward sweep cancels the body's forward
+     motion and the paw sits still on the grass. For the second half the foot is
+     UP, the knee folds to clear the ground, and the leg arcs forward on a
+     smoothstep. That is the whole trick — no IK, no ground raycast.
+
+     Amplitudes stay modest: the weight ramp is a skin, not a joint, and only
+     looks like a joint over a small angle. They scale to zero at rest so she
+     stands square rather than frozen mid-stride. */
+  function poseLegs(phase, speed) {
     var swing = clamp(speed / 2.4, 0, 1);
-    var A = 0.07 + 0.25 * swing;            // radians at the shoulder
-    var B = 0.09 + 0.34 * swing;            // radians at the knee, swing phase only
+    var A = 0.34 * swing;                   // radians at the shoulder
+    var B = 0.46 * swing;                   // radians at the knee, swing phase only
     for (var i = 0; i < RIG.legs.length; i++) {
       var L = RIG.legs[i], b = boneOf[L.id];
       var p = (phase + L.ph) % 1;
-      var th = Math.sin(p * Math.PI * 2) * A;
-      /* The knee only folds while the foot is off the ground. A leg that bends
-         through the stance phase looks like it is wading. */
-      var fold = Math.max(0, Math.sin(p * Math.PI * 2)) * B;
-      if (!L.fore) { th = -th; fold = -fold * 0.75; }
+      var th, fold;
+      if (p < 0.5) {                        // planted
+        th = A * (1 - 2 * (p / 0.5));
+        fold = 0;
+      } else {                              // through the air
+        var u = (p - 0.5) / 0.5;
+        th = -A + 2 * A * (u * u * (3 - 2 * u));
+        fold = Math.sin(u * Math.PI) * B;
+      }
+      /* The hock folds the opposite way to the carpus — a hind leg that bends
+         like a front one is the thing that makes a CG dog look like a table.
+         The SWING direction is not flipped: front-left and hind-right are a
+         diagonal pair and must leave the ground together, which is what makes
+         it a trot rather than a bunny hop. */
+      if (!L.fore) fold = -fold * 0.75;
       b.up.quaternion.setFromAxisAngle(axSide, th);
       b.lo.quaternion.setFromAxisAngle(axSide, -fold);
     }
@@ -711,17 +734,34 @@
       wLeg *= smooth(TRAINER.hipSide[0], TRAINER.hipSide[1], Math.abs(x));
       if (wLeg <= 0.002) continue;
       var wKnee = smooth(TRAINER.kneeY + 0.055, TRAINER.kneeY - 0.055, y);
-      var up = x >= 0 ? 1 : 3, lo = up + 1;
+      var up = x >= 0 ? 2 : 4, lo = up + 1;
       sw[o] = 1 - wLeg;
       si[o + 1] = up; sw[o + 1] = wLeg * (1 - wKnee);
       si[o + 2] = lo; sw[o + 2] = wLeg * wKnee;
+    }
+
+    /* Everything above the hips rides a CHEST bone. His arms are not rigged and
+       cannot be — they are 45 degrees out from a fused torso — so the walk gets
+       its arm swing from twisting the whole upper body instead, which is what a
+       walking body does anyway. The hips stay on the root, so the twist reads
+       as a torso rotating over the legs rather than the whole man turning. */
+    for (i = 0; i < n; i++) {
+      var o2 = i * 4;
+      if (sw[o2 + 1] > 0.002) continue;         // already claimed by a leg
+      var wCh = smooth(TRAINER.hipY, TRAINER.hipY + 0.16, pos.getY(i));
+      if (wCh <= 0.002) continue;
+      sw[o2] = 1 - wCh;
+      si[o2 + 1] = 1; sw[o2 + 1] = wCh;
     }
     geom.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
     geom.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
 
     var bones = [], root = new THREE.Bone();
-    bones.push(root);
-    [TRAINER.hipX, -TRAINER.hipX].forEach(function (hx) {
+    bones.push(root);                                  // 0
+    var chest = new THREE.Bone();                      // 1
+    chest.position.set(0, TRAINER.hipY, 0);
+    root.add(chest); bones.push(chest);
+    [TRAINER.hipX, -TRAINER.hipX].forEach(function (hx) {   // 2,3 then 4,5
       var up = new THREE.Bone();
       up.position.set(hx, TRAINER.hipY, 0);
       root.add(up); bones.push(up);
@@ -755,8 +795,9 @@
     g.position.y = -TRAINER.ground * TRAINER.tall;
     outer.add(shadowDisc(0.42));
     outer.userData.hand = hand;
-    outer.userData.legs = [bones[1], bones[3]];
-    outer.userData.knees = [bones[2], bones[4]];
+    outer.userData.chest = chest;
+    outer.userData.legs = [bones[2], bones[4]];
+    outer.userData.knees = [bones[3], bones[5]];
     return outer;
   }
 
@@ -824,28 +865,51 @@
   /* The handler walks. Without this the figure slides across the grass like a
      game piece, and since half the drill is the student moving their own feet,
      a handler who never takes a step undercuts the whole thing. */
-  function poseHandler(t, moving) {
-    var ud = handlerObj.userData;
-    G.manGait = (G.manGait || 0) + (moving ? 0.055 : 0);
-    /* Amplitude is eased rather than switched, so stopping is a stride that
-       settles instead of a leg frozen mid-air. */
-    G.manAmp = lerp(G.manAmp || 0, moving ? 1 : 0, 0.10);
-    var a = Math.sin(G.manGait * Math.PI * 2) * G.manAmp;
+  var MAN_STRIDE = 0.78;                 // metres of ground per full cycle
 
-    if (ud.legs) {                       // the generated mesh, skinned
-      ud.legs[0].rotation.x = a * 0.40;
-      ud.legs[1].rotation.x = -a * 0.40;
-      /* The knee only folds on the leg that is coming through, and never
-         backwards — a knee that bends the wrong way is the first thing anyone
-         notices about a walk. */
-      ud.knees[0].rotation.x = -Math.max(0, a) * 0.55;
-      ud.knees[1].rotation.x = -Math.max(0, -a) * 0.55;
+  function poseHandler(dt, moving) {
+    var ud = handlerObj.userData;
+
+    /* The phase was `+= 0.055` per FRAME — no dt and no speed. That is a bug,
+       not just a stylistic one: on a 120 Hz screen his legs ran at double
+       speed. It is now metres of ground per stride, exactly like the dog. */
+    var vx = G.man.vx || 0, vz = G.man.vz || 0;
+    var speed = Math.hypot(vx, vz);
+    G.manGait = ((G.manGait || 0) + (speed * dt) / MAN_STRIDE) % 1;
+
+    // his own frame: he is always facing the dog
+    var fwdX = Math.sin(G.man.yaw), fwdZ = Math.cos(G.man.yaw);
+    var vFwd = vx * fwdX + vz * fwdZ;          // + toward her, - backing away
+    var vSide = vx * fwdZ - vz * fwdX;         // + one way round her, - the other
+
+    var k = 1 - Math.pow(0.02, dt);
+    G.manF = lerp(G.manF || 0, clamp(vFwd / 1.55, -1, 1), k);
+    G.manS = lerp(G.manS || 0, clamp(vSide / 1.55, -1, 1), k);
+    G.manAmp = lerp(G.manAmp || 0, moving ? 1 : 0, k);
+
+    var a = Math.sin(G.manGait * Math.PI * 2);
+    var fore = a * G.manF, side = a * G.manS;
+
+    if (ud.legs) {                             // the generated mesh, skinned
+      // fore-aft stride, signed — backing away plays the stride in reverse
+      ud.legs[0].rotation.x =  fore * 0.44;
+      ud.legs[1].rotation.x = -fore * 0.44;
+      // and a scissoring side-step when he arcs round her
+      ud.legs[0].rotation.z =  side * 0.30;
+      ud.legs[1].rotation.z = -side * 0.30;
+      /* The knee folds only on the leg coming through, and never backwards —
+         a knee bending the wrong way is the first thing anyone notices. */
+      var lift = Math.max(Math.abs(G.manF), Math.abs(G.manS)) * 0.52;
+      ud.knees[0].rotation.x = -Math.max(0, a) * lift;
+      ud.knees[1].rotation.x = -Math.max(0, -a) * lift;
+      // torso counter-rotation: this is what swings the arms
+      if (ud.chest) ud.chest.rotation.y = -fore * 0.09;
       return;
     }
-    if (!ud.hips) return;                // the primitive fallback
-    ud.hips[0].rotation.x = a * 0.46;
-    ud.hips[1].rotation.x = -a * 0.46;
-    if (ud.arm) ud.arm.rotation.z = -a * 0.16;
+    if (!ud.hips) return;                      // the primitive fallback
+    ud.hips[0].rotation.x = fore * 0.46;
+    ud.hips[1].rotation.x = -fore * 0.46;
+    if (ud.arm) ud.arm.rotation.z = -fore * 0.16;
   }
 
   /* The distraction: something worth leaving you for, parked at the edge of the
@@ -886,29 +950,72 @@
     return m;
   }
 
-  var lp = { a: null, b: null, ctrl: null, pt: null, prev: null, tan: null, off: null };
-  function updateLeash(from, to, tension) {
-    if (!leash) return;
-    if (!lp.a) {
-      lp.a = new THREE.Vector3(); lp.b = new THREE.Vector3();
-      lp.ctrl = new THREE.Vector3(); lp.pt = new THREE.Vector3();
-      lp.prev = new THREE.Vector3(); lp.tan = new THREE.Vector3();
-      lp.off = new THREE.Vector3();
+  /* ── the line, as a rope with memory ─────────────────────────────────────
+     It was a quadratic Bezier rebuilt from the two endpoints every frame, so it
+     had no past: it could not swing when the handler turned, could not lag when
+     she accelerated, and slid between shapes with no weight at all. The lead is
+     the most-looked-at object on this tab — the whole drill is reading it — and
+     a stiff parabola reads as a broom handle.
+
+     So it is a Verlet rope: positions, previous positions, gravity, and a few
+     relaxation passes pulling neighbouring beads back to the rest spacing with
+     both ends pinned. Sag, swing and the visible jolt as it comes tight all
+     fall out of that rather than being drawn on. */
+  var rope = null;
+  var rv = { d: null, tan: null, off: null };
+  function initRope(a, b) {
+    rope = { p: [], q: [], n: LEASH_SEG + 1, rest: 0 };
+    for (var i = 0; i <= LEASH_SEG; i++) {
+      var v = new THREE.Vector3().lerpVectors(a, b, i / LEASH_SEG);
+      rope.p.push(v);
+      rope.q.push(v.clone());
     }
-    lp.a.copy(from); lp.b.copy(to);
-    var d = lp.a.distanceTo(lp.b);
-    /* Sag is what is left of the line after the gap has taken its share. A
-       quadratic through a control point dropped below the midpoint is not a
-       true catenary, but at these lengths the two are within a few millimetres
-       and this one costs three adds. */
-    var slackLen = Math.max(0, G.line - d);
-    var sag = Math.min(slackLen * 0.62, G.line * 0.45);
+    rv.d = new THREE.Vector3(); rv.tan = new THREE.Vector3(); rv.off = new THREE.Vector3();
+  }
 
-    lp.ctrl.addVectors(lp.a, lp.b).multiplyScalar(0.5);
-    lp.ctrl.y -= sag;
+  function stepRope(a, b, dt) {
+    if (!rope) initRope(a, b);
+    // rest spacing follows the line's own length, so stage 4 really does carry
+    // twice the rope rather than the same rope stretched
+    rope.rest = G.line / LEASH_SEG;
 
-    var pos = leash.geometry.attributes.position;
-    var arr = pos.array;
+    var h = Math.min(dt, 1 / 30);
+    var damp = 0.986, g = -9.81 * h * h;
+    var i, k;
+    for (i = 0; i < rope.n; i++) {
+      var p = rope.p[i], q = rope.q[i];
+      var vx = (p.x - q.x) * damp, vy = (p.y - q.y) * damp, vz = (p.z - q.z) * damp;
+      q.copy(p);
+      p.x += vx; p.y += vy + g; p.z += vz;
+    }
+    rope.p[0].copy(a);
+    rope.p[rope.n - 1].copy(b);
+
+    for (k = 0; k < 6; k++) {
+      for (i = 0; i < rope.n - 1; i++) {
+        var p1 = rope.p[i], p2 = rope.p[i + 1];
+        rv.d.subVectors(p2, p1);
+        var len = rv.d.length();
+        if (len < 1e-6) continue;
+        var diff = (len - rope.rest) / len * 0.5;
+        /* A rope pulls and never pushes. Without this, a compressed pair
+           springs apart and a slack line jitters like coiled wire instead of
+           hanging still. */
+        if (diff < 0) continue;
+        rv.d.multiplyScalar(diff);
+        if (i !== 0) p1.add(rv.d);
+        if (i + 1 !== rope.n - 1) p2.sub(rv.d);
+      }
+      rope.p[0].copy(a);
+      rope.p[rope.n - 1].copy(b);
+      for (i = 1; i < rope.n - 1; i++) if (rope.p[i].y < 0.012) rope.p[i].y = 0.012;
+    }
+  }
+
+  function updateLeash(from, to, tension, dt) {
+    if (!leash) return;
+    stepRope(from, to, dt);
+    var pos = leash.geometry.attributes.position, arr = pos.array;
     /* Wider than a real lead. A 20 mm lead at the drill's own framing is under
        a pixel, and the SHAPE of this line is the entire reading the tab is
        teaching — so it is drawn to be legible at playing distance, and looks
@@ -917,19 +1024,13 @@
     var half = lerp(0.013, 0.008, tension);
     var cam = st.camera;
     for (var i = 0; i <= LEASH_SEG; i++) {
-      var t = i / LEASH_SEG, it = 1 - t;
-      lp.pt.set(
-        it * it * lp.a.x + 2 * it * t * lp.ctrl.x + t * t * lp.b.x,
-        it * it * lp.a.y + 2 * it * t * lp.ctrl.y + t * t * lp.b.y,
-        it * it * lp.a.z + 2 * it * t * lp.ctrl.z + t * t * lp.b.z);
-      if (i === 0) lp.prev.copy(lp.pt);
-      lp.tan.subVectors(lp.pt, lp.prev);
-      if (lp.tan.lengthSq() < 1e-9) lp.tan.subVectors(lp.b, lp.a);
-      lp.off.subVectors(cam.position, lp.pt).cross(lp.tan).normalize().multiplyScalar(half);
+      var pt = rope.p[i];
+      rv.tan.subVectors(rope.p[Math.min(i + 1, LEASH_SEG)], rope.p[Math.max(i - 1, 0)]);
+      if (rv.tan.lengthSq() < 1e-9) rv.tan.subVectors(to, from);
+      rv.off.subVectors(cam.position, pt).cross(rv.tan).normalize().multiplyScalar(half);
       var o = i * 6;
-      arr[o]     = lp.pt.x - lp.off.x; arr[o + 1] = lp.pt.y - lp.off.y; arr[o + 2] = lp.pt.z - lp.off.z;
-      arr[o + 3] = lp.pt.x + lp.off.x; arr[o + 4] = lp.pt.y + lp.off.y; arr[o + 5] = lp.pt.z + lp.off.z;
-      lp.prev.copy(lp.pt);
+      arr[o]     = pt.x - rv.off.x; arr[o + 1] = pt.y - rv.off.y; arr[o + 2] = pt.z - rv.off.z;
+      arr[o + 3] = pt.x + rv.off.x; arr[o + 4] = pt.y + rv.off.y; arr[o + 5] = pt.z + rv.off.z;
     }
     pos.needsUpdate = true;
   }
@@ -980,7 +1081,16 @@
       G.man.x += (fx / l) * sp;
       G.man.z += (fz / l) * sp;
       G.man.moving = true;
-    } else G.man.moving = false;
+      /* Velocity is kept, not just the fact of moving. He always FACES the dog,
+         so walking backwards and side-stepping are the normal case here, and
+         the legs have to know which — a forward stride played while backing
+         away is the single most obvious tell in the whole scene. */
+      G.man.vx = (fx / l) * 1.55;
+      G.man.vz = (fz / l) * 1.55;
+    } else {
+      G.man.moving = false;
+      G.man.vx = 0; G.man.vz = 0;
+    }
 
     G.man.yaw = Math.atan2(fwdX, fwdZ);
     var r = Math.hypot(G.man.x, G.man.z);
@@ -1092,6 +1202,7 @@
     D.yaw += clamp(dy, -3.2 * dt, 3.2 * dt);
 
     D.sp += clamp(target - D.sp, -5 * dt, 3.4 * dt);
+    var wasX = D.x, wasZ = D.z;
     D.x += Math.sin(D.yaw) * D.sp * dt;
     D.z += Math.cos(D.yaw) * D.sp * dt;
 
@@ -1108,7 +1219,25 @@
     var r = Math.hypot(D.x, D.z);
     if (r > 27) { D.x *= 27 / r; D.z *= 27 / r; }
 
-    G.gait = (G.gait + dt * (0.55 + D.sp * 0.62)) % 1;
+    /* THE GAIT IS DRIVEN BY GROUND COVERED, NOT BY CLOCK AND NOT BY INTENT.
+
+       It was `dt * (0.55 + sp * 0.62)` — a timer. Her legs cycled at one rate
+       while her body moved at another, so her paws slid, and that 0.55 had a
+       standing dog marching on the spot.
+
+       Driving it from D.sp instead was still wrong, and wrong in a way only a
+       measurement caught: pinned at the end of a taut line she keeps a healthy
+       D.sp while the constraint above puts her straight back where she was, so
+       her feet churned over ground she was not covering. What the legs must
+       follow is the displacement that SURVIVED the constraint — measured here,
+       after it. Stride length grows with speed because dogs lengthen their
+       stride rather than just cycling faster. */
+    var moved = Math.hypot(D.x - wasX, D.z - wasZ);
+    var stride = lerp(0.62, 1.05, clamp((moved / Math.max(dt, 1e-4)) / 2.4, 0, 1));
+    G.gait = (G.gait + moved / stride) % 1;
+    /* What the legs are told, so a dog held on a tight line stands and leans
+       rather than running on the spot. */
+    D.ground = moved / Math.max(dt, 1e-4);
   }
 
   /* Tension. On the line it is how much of the line has been taken up; off it
@@ -1464,7 +1593,7 @@
     var bob = Math.sin(G.gait * Math.PI * 4) * 0.012 * clamp(G.dog.sp, 0, 2) * M;
     dogRoot.position.y += bob;
 
-    poseLegs(G.gait, G.dog.sp, dt);
+    poseLegs(G.gait, G.dog.ground || 0);
     poseTail(G.t, G.arousal, G.dog.sp > 0.3);
 
     /* Her head goes where her attention is. When she is coming to you it comes
@@ -1483,11 +1612,14 @@
     G.headDip = lerp(G.headDip || 0, wantDip, 1 - Math.pow(0.02, dt));
     poseHead(G.headYaw, G.headDip);
 
-    handlerObj.position.set(G.man.x, 0, G.man.z);
+    poseHandler(dt, !!G.man.moving);
+    // a walking body rises and falls twice a cycle; standing still, it does not
+    var mbob = Math.abs(Math.sin((G.manGait || 0) * Math.PI * 2)) * 0.016 * (G.manAmp || 0);
+    handlerObj.position.set(G.man.x, mbob, G.man.z);
     handlerObj.rotation.y = G.man.yaw;
-    poseHandler(G.t, !!G.man.moving);
 
-    if (leash && leash.visible) updateLeash(handMetres(), clipMetres(), G.tension);
+    if (leash && leash.visible) updateLeash(handMetres(), clipMetres(), G.tension, dt);
+    else rope = null;                 // stage 5 takes the line off; forget its shape
   }
 
   var lastPaint = 0;
