@@ -1,155 +1,65 @@
 {
-  "updated": "section plate rebuilt; fixing a shear that only shows in a demo",
-  "headline": "The plate is real anatomy now \u2014 and the critic found a fault that only appears where you would demo it",
-  "note": "Verified still true, anatomy reads, all gates pass, and zero overflow across ~15,600 swept states. Not called premium yet: above height 69 the crest structure shears off the midline, and the teaching band itself is clean \u2014 so it is invisible in normal use and fatal the moment someone drags the slider to the top.",
-  "gates": [
-    {
-      "name": "Console clean",
-      "state": "pass"
-    },
-    {
-      "name": "Opens on file:// \u2014 no server, no CDN",
-      "state": "pass"
-    },
-    {
-      "name": "No horizontal overflow at 414px",
-      "state": "pass"
-    },
-    {
-      "name": "No-WebGL path tested",
-      "state": "pass"
-    },
-    {
-      "name": "Fit grading 4/4 when correct",
-      "state": "pass"
-    },
-    {
-      "name": "Full level-1-to-verdict run",
-      "state": "pass"
-    }
-  ],
-  "pieces": [
-    {
-      "id": "audit",
-      "name": "Manual accuracy audit",
-      "sub": "every part name vs the real 1900X manual",
-      "state": "done",
-      "round": 1,
-      "critic": "n/a \u2014 judged on correctness",
-      "gap": "Written. 7 discrepancies found against the course slides and the old build."
-    },
-    {
-      "id": "shell",
-      "name": "Shell & identity",
-      "sub": "tabs, palette, type, 414px, no-WebGL",
-      "state": "done",
-      "round": 5,
-      "critic": "R5: \"Ours no longer breaks when you turn it \u2014 round 4's verdict is genuinely fixed, and I could not reproduce it under measurement.\" All gates pass, no regressions, two things better than round 4.",
-      "gap": "Closed. Remaining objection was the unbuilt drills, which is not the shell's to fix."
-    },
-    {
-      "id": "recv",
-      "name": "Tab 1 \u00b7 Receiver",
-      "sub": "nomenclature, hotspots, part list",
-      "state": "done",
-      "round": 5,
-      "critic": "Judged as part of the shell \u2014 \"the nomenclature half is now genuinely strong.\"",
-      "gap": ""
-    },
-    {
-      "id": "tx",
-      "name": "Tab 2 \u00b7 Transmitter",
-      "sub": "nomenclature, hotspots, part list",
-      "state": "done",
-      "round": 5,
-      "critic": "Judged as part of the shell \u2014 \"the nomenclature half is now genuinely strong.\"",
-      "gap": ""
-    },
-    {
-      "id": "fit",
-      "name": "Tab 3 \u00b7 Fit the collar",
-      "sub": "THE APP \u2014 cross-section, 4/4 grading",
-      "state": "done",
-      "round": 5,
-      "critic": "Band measured off the mesh, photographed from a lateral camera: \"textbook... I would put my name to this one.\" Both drills complete at 1440 and 414.",
-      "gap": "Presentation: at 1180px the marking card overlays the 3D pane, so the card describes a collar you cannot see while reading it. At 1440 they sit side by side."
-    },
-    {
-      "id": "level",
-      "name": "Tab 4 \u00b7 Working level",
-      "sub": "THE APP \u2014 level 1 to verdict",
-      "state": "done",
-      "round": 2,
-      "critic": "Verified over six full runs with the log placed beside the verdict, three of them deliberate misses at threshold. Every factual claim traceable to a log line.",
-      "gap": "Closed. The hidden threshold is now revealed separately and labelled, instead of being asserted as something the student saw."
-    },
-    {
-      "id": "section",
-      "name": "Cross-section panel",
-      "sub": "premium anatomical plate, still live",
-      "state": "rework",
-      "round": 4,
-      "critic": "R3: still true, anatomy reads, all gates pass, worst overflow 0px across ~15,600 states. Not premium yet.",
-      "gap": "Above h69 the nuchal ligament walks 10.3 units off the midline and GROWS 52% while the neck narrows 8% \u2014 the only structure getting bigger as the section shrinks. On screen it tilts 25-30 degrees onto the muscle belly."
-    }
-  ],
-  "log": [
-    "Read all 14 photographs of the owner's own unit, serial 126072.",
-    "Side-button glyphs confirmed at full resolution: circled B over P on one rail, T over L on the other.",
-    "Pulled the real 1900X manual (48pp) from dogtra.com \u2014 the 1900S manual that search returns is a different generation and was discarded.",
-    "Opened BioDigital Human at desktop and iPad landscape. Found the no-login route: /explore walls you, /widget does not.",
-    "Sampled the Highland Canine mark and white-balanced it: blue #1560A6, orange #CF8B3E.",
-    "Scaffolded ~/Desktop/E-COLLAR-1900X (the old build at E-COLLAR-3D is untouched and read-only).",
-    "Confirmed the vendored Three.js is r128 UMD \u2014 no ES modules, no CDN.",
-    "Wrote the module contract so parallel builders cannot overwrite each other.",
-    "Round 1 critic: ours rendered nothing at all \u2014 lost on all four judged axes by absence.",
-    "Round 2 critic found a real defect: one failed mesh raised an error veil across ALL FOUR tabs and cached the rejection, so it could never retry. Fixed at the root \u2014 the veil is now per-pane.",
-    "Round 3 critic: every hard gate passes under its own verification. Remaining gap is framing, not correctness.",
-    "Checked the E-COLLAR-3D repo \u2014 clean and matching origin. The commit at 15:11 is your own parallel session, not an agent of mine. Nothing reverted.",
-    "Round 4 critic operated both apps rather than screenshotting them, and measured: the active label \"01 Antenna\" sat 100% underneath the Reset view chip; pills 03/04 overlapped by 24x26px; \"01 Strap\" was clipped to \"01 Stra\"; a 140px vertical drag rolled the collar upside down.",
-    "It also listed what ours already beats BioDigital on, so the next builder does not regress it: the labelled Reset view (theirs is an unlabelled crosshair), hotspots that say what is clickable before you click, manual citations in the reference column, and the 414px layout.",
-    "Rounds 5-9 launched: a real collision solver, clamping, a stable up axis, occlusion handling and non-crossing leader lines \u2014 built once in the shared stage, since all four tabs mount on it.",
-    "Session usage limit hit at 18:10 \u2014 nine of ten agents were killed. No work was lost; round 5 had already written to disk.",
-    "Round 5 replaced the push-apart hack with a real solver: hotspots are packed onto a fitted ring whose radii are capped so a pill is wholly inside the layer by construction \u2014 nothing is clamped, so nothing can be cropped.",
-    "Leader crossings are now prevented by monotone ordering, plus an uncrossing pass that provably terminates, plus a final check that demotes any surviving crossing to a plain dot. \"No crossings\" became a guarantee rather than a tendency.",
-    "TrackballControls swapped for OrbitControls with the polar angle clamped \u2014 the model can no longer be rolled onto its side or inverted.",
-    "models.js split into models-receiver.js and models-transmitter.js, so opening tab 1 no longer parses 1.4MB of transmitter nobody asked for.",
-    "Round 5 measured across 360 orientations (2 models x 3 viewports x 3-4 elevations x 24 azimuths): ZERO pill overlaps, ZERO clipped pills, ZERO toolbar collisions, ZERO leader crossings \u2014 including 12 transmitter parts inside a 414x284 layer.",
-    "Five successive 2000px vertical drags each stopped dead at 170.83 degrees. The model can no longer be tumbled into a pose you cannot recover from.",
-    "Critic found a real honesty bug: the no-WebGL copy promises drills that were never written. Fixing it is part of building them.",
-    "Corrected the build contract \u2014 your 15:11 commit removed the rigid head cut, so the old description would have sent builders backwards.",
-    "Tabs 3 and 4 launched in parallel, each with its own builder and critic, each required to complete its own drill to a verdict before reporting.",
-    "Both drills built and both complete a full run: fit reaches a 4/4 score, level runs 1-to-verdict.",
-    "Tab 3 critic caught an invented manufacturer claim. Verified against the manual myself before letting the builder act: p.43 never mentions longer posts, and prescribes trimming the coat instead.",
-    "Tab 4 critic caught a logic bug that undermines the teaching: the verdict was reading the hidden threshold rather than the run log, so it could report a response that never happened.",
-    "Fed two new manual findings back to the builders: the p.43 troubleshooting ORDER puts contact-with-skin above raising the level, and the manual does supply some of the tells (neck movement, head shaking, looking over the shoulder, \"may be very subtle\").",
-    "Fit round 2: a correct fit scores 4/4 and each of the four wrong fits scores 3/4 with a specific, real cost. The critic called the marking card the best thing in the app.",
-    "Removed the false claim about longer contact posts from app.js myself \u2014 it survived a round only because my module contract gave that file to a different owner. Verified gone from every file.",
-    "Rewrote the no-WebGL fit copy: it promised marking on three decisions when the drill marks four, and omitted the coat \u2014 the one the tab exists for.",
-    "HARNESS LIMIT FOUND: critics cannot operate BioDigital. The shared browser pane runs backgrounded, so its 3D scene is frozen and synthetic clicks reach no page at all. Static comparison works; operated comparison does not.",
-    "Level drill VERIFIED fixed: six runs, log beside verdict, three deliberate misses at threshold. It now says \"you sent level 11 three times and she answered twice\" and reveals the threshold separately rather than claiming she answered when she did not.",
-    "Fit verifier disproved the original bug report \u2014 nothing ever stops being drawn \u2014 then found the real fault: the pass band is on the dog's head, not its neck.",
-    "The guard added last round was half dead code: its off-the-neck arm can never fire, because the threshold was picked to keep the old default inside the band rather than measured against the neck.",
-    "This also contaminates tab 4, which stands the dog in that same default fit \u2014 so the working-level dog is wearing the collar round its face too.",
-    "New round mandates measurement over eyeballing: find the jaw line and the shoulder on dog.glb by raycasting, derive the band from that, and prove it with lateral screenshots at every band boundary.",
-    "Fit band re-derived by measurement, not by eye: sliders 42-56, default 49. The old default 72 \u2014 a strap across the cheek \u2014 is now correctly marked 3/4.",
-    "That fix exposed the last contradiction: tab 4 was standing the dog in height 0.80, which tab 3 now fails as \"round the jaw\". The two drills were teaching opposite things about the same collar.",
-    "Fixed it structurally rather than by copying the number across \u2014 tab 4 now reads tab 3's published answer at load, so they cannot drift apart again whichever tab the student opens first.",
-    "Also fixed a copy bug the verifier caught in the opposite direction: the app said \"the strap is round the jaw\" for five steps where the strap was demonstrably still on the neck. It now degrades honestly.",
-    "Final whole-app verification running: both drills at both widths, all gates in one session, teaching accuracy against the manual, and a blind static comparison.",
-    "Final pass caught the longer-posts falsehood STILL LIVE in parts.js \u2014 tab 1 contradicted tab 3 on the same part, under a manual citation. My earlier check grepped three files and missed the data file.",
-    "Fixed it, and verified in the browser this time rather than by grep: tab 1 now carries the p.43 clip-the-hair remedy and states no longer pair is in the box.",
-    "Moved the \"round the jaw\" boundary from 62 to 66 \u2014 the verifier proved 61 and 62 are photographically the same picture, so the old boundary called a strap on the neck a strap on the jaw.",
-    "Verified live: 42-51 \"clear of the shoulder\", 52-56 \"behind the ears\", 57-65 \"riding up onto the head\", 66+ \"round the jaw\". Console: no logs at all.",
-    "Rewrote a stale comment that told the next developer level.js carries its own copy of the fit numbers \u2014 following it would have re-created the bug that made the two drills contradict each other.",
-    "You flagged the cross-section as not looking premium or real. Agreed \u2014 the neck interior was an abstract blob with a \"+\" and a circle, and \"coat parted skin\" was colliding with the panel edge.",
-    "Used Higgsfield to generate a veterinary-grade anatomy plate as the structural reference \u2014 correct placement of trachea, oesophagus, vertebra, spinal cord, carotid sheaths and nuchal ligament.",
-    "Deliberately NOT embedding that image: the neck outline changes shape with height, so a fixed picture would stop matching the moment a student moved a slider. The anatomy gets hand-drawn as vector paths that scale with the measurement.",
-    "The windpipe now has to read at a glance, because the manual target is \"one contact either side of the windpipe\" and a student has to see that the posts are beside it, not on it.",
-    "Cross-section rebuilt as a real plate: vertebra with its canal, muscle bellies with fibre striations, carotid sheaths, windpipe with cartilage, coat as actual hair, skin as its own layer \u2014 all scaled to the live measured outline.",
-    "The overflow bug is fixed at the cause: every string is now measured with getBBox() after it is set, instead of guessing widths from character counts. Critic swept ~15,600 states and measured zero clipped glyphs.",
-    "Panel A now reads as a section rather than a bar chart, with the shortfall marked as a dimensioned 27% the way an engineering drawing marks one.",
-    "The blunt copy survived the polish \u2014 \"Points stop in the coat\" and \"Never touched\" are untouched. That was the main risk in making it prettier.",
-    "Critic caught a shear above h69 that is invisible in the 4/4 teaching band but breaks the \"measured off your dog\" claim in one drag. Being fixed, along with demoting the label typography so the drawing outranks its labels."
-  ]
+ "updated": "references captured; round 1 builders still out",
+ "headline": "Photoreal gauntlet: bar is three.js's own sky and grass demos, direction is RDR2",
+ "note": "Both halves of every blind pair are now on disk: the real three.js sky (at its own sunset default AND re-shot at a daytime sun so it matches our field's time of day), the instancing-scatter demo for grass, and our scene as it stands today. Builders are writing standalone prototypes. Honest finding: three.js ships no dedicated grass demo \u2014 instancing-scatter is the nearest thing, so for grass the bar is weaker and RDR2 as the direction has to do more of the work.",
+ "gates": [
+  {
+   "name": "Holds 60fps",
+   "state": "pending"
+  },
+  {
+   "name": "Works offline \u2014 zero network requests",
+   "state": "pending"
+  },
+  {
+   "name": "Single-file build still opens by double-click",
+   "state": "pending"
+  }
+ ],
+ "pieces": [
+  {
+   "id": "sky",
+   "name": "Sky",
+   "sub": "bar: threejs.org/examples/webgl_shaders_sky.html",
+   "state": "building",
+   "round": 1,
+   "critic": "",
+   "gap": "Currently a flat background colour and linear fog. No sun, no scattering, no gradient."
+  },
+  {
+   "id": "grass",
+   "name": "Grass",
+   "sub": "bar: three.js instanced-grass examples",
+   "state": "building",
+   "round": 1,
+   "critic": "",
+   "gap": "Currently one tiled photo on a flat plane. No blades, no depth, no wind, and it tiles visibly."
+  },
+  {
+   "id": "man",
+   "name": "The trainer",
+   "sub": "look and movement \u2014 must read as a real man",
+   "state": "building",
+   "round": 1,
+   "critic": "",
+   "gap": "Unrigged photogrammetry scan, hand-rigged: fused thighs, no elbow, no shoulder. Mixamo needs a login an agent cannot do \u2014 a rigged humanoid that works offline has to be found."
+  },
+  {
+   "id": "dog",
+   "name": "Dog locomotion",
+   "sub": "direction: real gait, judged against Muybridge",
+   "state": "building",
+   "round": 1,
+   "critic": "",
+   "gap": "Ground-locked walk/trot with a spine bend is in. No acceleration lean, no head bob, no foot IK, paws do not conform to the ground."
+  }
+ ],
+ "log": [
+  "Bar set: three.js's own sky and grass examples are the pass mark; Red Dead Redemption 2 is the direction, not the bar.",
+  "Gates written down before any building: 60fps, zero network, single-file build still works.",
+  "Round 1 builders sent out on all four pieces in parallel, each into its own prototype so they cannot collide.",
+  "Captured the bar: three.js sky example at 1560x852, both at its sunset default and re-shot at a 38-degree sun so the comparison is like-for-like with a daytime field.",
+  "Captured our own scene at three framings to be the 'before' half of each blind pair.",
+  "Searched all 588 three.js examples: there is no grass demo. webgl_instancing_scatter is the closest, so the grass bar is softer than the sky bar."
+ ]
 }
