@@ -1,7 +1,7 @@
 {
- "updated": "references captured; round 1 builders still out",
- "headline": "Photoreal gauntlet: bar is three.js's own sky and grass demos, direction is RDR2",
- "note": "Both halves of every blind pair are now on disk: the real three.js sky (at its own sunset default AND re-shot at a daytime sun so it matches our field's time of day), the instancing-scatter demo for grass, and our scene as it stands today. Builders are writing standalone prototypes. Honest finding: three.js ships no dedicated grass demo \u2014 instancing-scatter is the nearest thing, so for grass the bar is weaker and RDR2 as the direction has to do more of the work.",
+ "updated": "round 1 built; critics judging blind",
+ "headline": "All four pieces built. Sky and grass are in blind A/B against the bar right now.",
+ "note": "Builders delivered a vendored Preetham sky with a cloud deck and aerial perspective, 206,000 instanced grass blades on three LOD rings, a 26-bone trainer rebuilt from the scan with the fused trousers cut and a foot-planted walk, and a dog rebuilt on world-anchored footfalls. The sky and grass pairs were shuffled on disk before any critic saw them; the key is sealed. One builder measurement contradicts something I told Remi earlier \u2014 see the log.",
  "gates": [
   {
    "name": "Holds 60fps",
@@ -21,7 +21,7 @@
    "id": "sky",
    "name": "Sky",
    "sub": "bar: threejs.org/examples/webgl_shaders_sky.html",
-   "state": "building",
+   "state": "judging",
    "round": 1,
    "critic": "",
    "gap": "Currently a flat background colour and linear fog. No sun, no scattering, no gradient."
@@ -30,7 +30,7 @@
    "id": "grass",
    "name": "Grass",
    "sub": "bar: three.js instanced-grass examples",
-   "state": "building",
+   "state": "judging",
    "round": 1,
    "critic": "",
    "gap": "Currently one tiled photo on a flat plane. No blades, no depth, no wind, and it tiles visibly."
@@ -39,7 +39,7 @@
    "id": "man",
    "name": "The trainer",
    "sub": "look and movement \u2014 must read as a real man",
-   "state": "building",
+   "state": "judging",
    "round": 1,
    "critic": "",
    "gap": "Unrigged photogrammetry scan, hand-rigged: fused thighs, no elbow, no shoulder. Mixamo needs a login an agent cannot do \u2014 a rigged humanoid that works offline has to be found."
@@ -48,7 +48,7 @@
    "id": "dog",
    "name": "Dog locomotion",
    "sub": "direction: real gait, judged against Muybridge",
-   "state": "building",
+   "state": "judging",
    "round": 1,
    "critic": "",
    "gap": "Ground-locked walk/trot with a spine bend is in. No acceleration lean, no head bob, no foot IK, paws do not conform to the ground."
@@ -60,6 +60,10 @@
   "Round 1 builders sent out on all four pieces in parallel, each into its own prototype so they cannot collide.",
   "Captured the bar: three.js sky example at 1560x852, both at its sunset default and re-shot at a 38-degree sun so the comparison is like-for-like with a daytime field.",
   "Captured our own scene at three framings to be the 'before' half of each blind pair.",
-  "Searched all 588 three.js examples: there is no grass demo. webgl_instancing_scatter is the closest, so the grass bar is softer than the sky bar."
+  "Searched all 588 three.js examples: there is no grass demo. webgl_instancing_scatter is the closest, so the grass bar is softer than the sky bar.",
+  "Sky: THREE.Sky is absent from r128, so it was vendored. Preetham scattering, cloud deck, crepuscular rays, aerial perspective sharing the sky's own scatter function. 2.19 ms GPU at 1600x1000 on an M5.",
+  "Grass: 206,000 blades, 902k triangles, 5 draw calls, 6.5 ms. Blades carry a cell index rather than a position, so they stay pinned to the world while the buffer stays pinned to the camera.",
+  "Trainer: no redistributable rigged humanoid exists that is worth using - three.js's good ones are Mixamo-licensed, the free ones are a cartoon robot and a low-poly mannequin. So the scan was kept and given a real 26-bone rig, the fused trousers cut along the surface equidistant from both leg chains, and a walk driven from the planted foot with the pelvis height derived. Foot slip 0.00 mm.",
+  "CORRECTION, and it is mine: the dog builder measured 90.2% paw slip in the CURRENT shipped gait. My earlier ground-lock test verified the phase clock against distance, not the foot against the ground - the stance sweep runs the wrong way and its amplitude is too small. The rebuild measures 4.2%."
  ]
 }

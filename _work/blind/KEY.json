@@ -1,0 +1,10 @@
+{
+ "sky": {
+  "A": "ours",
+  "B": "bar"
+ },
+ "grass": {
+  "A": "bar",
+  "B": "ours"
+ }
+}

@@ -1,0 +1,1723 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GAUNTLET — dog locomotion</title>
+<style>
+  :root{
+    --ink:#E9EDE6; --dim:#9FA99A; --line:rgba(233,237,230,.16);
+    --good:#8FD07A; --warn:#E3B455; --bad:#E0705A; --key:#C8D6E2;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#10130F;overflow:hidden;
+    font:13px/1.42 ui-monospace,"SF Mono",Menlo,Consolas,monospace;color:var(--ink)}
+  #cv{position:fixed;inset:0}
+  canvas{display:block}
+
+  .panel{position:fixed;background:rgba(12,15,11,.80);border:1px solid var(--line);
+    border-radius:4px;padding:9px 11px;backdrop-filter:blur(6px);pointer-events:none}
+
+  #hud{top:12px;left:12px;min-width:302px}
+  #hud h1{margin:0 0 7px;font:600 11px/1 ui-monospace,monospace;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--key)}
+  #hud .sub{color:var(--dim);font-size:10.5px;margin:-4px 0 8px;letter-spacing:.03em}
+  table{border-collapse:collapse;width:100%}
+  td{padding:1px 0;vertical-align:baseline;white-space:nowrap}
+  td.k{color:var(--dim);padding-right:10px}
+  td.v{text-align:right;font-variant-numeric:tabular-nums}
+  tr.rule td{border-top:1px solid var(--line);padding-top:5px}
+  tr.gap td{height:6px;padding:0;border:0}
+  .num{font-variant-numeric:tabular-nums}
+  .good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+  .bar{display:inline-block;width:74px;height:5px;background:rgba(255,255,255,.10);
+    border-radius:3px;overflow:hidden;vertical-align:middle;margin-left:6px}
+  .bar i{display:block;height:100%;background:var(--good)}
+
+  #legs{margin-top:6px;border-top:1px solid var(--line);padding-top:5px}
+  #legs td{font-size:11.5px}
+  .st-P{color:var(--good)} .st-S{color:var(--dim)}
+
+  #keys{bottom:12px;left:12px;max-width:430px;color:var(--dim);font-size:11px;line-height:1.55}
+  #keys b{color:var(--key);font-weight:600}
+
+  #tag{top:12px;right:12px;text-align:right;font-size:11px;color:var(--dim)}
+  #tag b{color:var(--ink);font-weight:600;letter-spacing:.05em}
+
+  #insetFrame{position:fixed;border:1px solid rgba(233,237,230,.30);border-radius:3px;
+    pointer-events:none;box-shadow:0 6px 26px rgba(0,0,0,.5)}
+  #insetLabel{position:fixed;pointer-events:none;font-size:10px;letter-spacing:.09em;
+    text-transform:uppercase;color:rgba(233,237,230,.72);
+    background:rgba(12,15,11,.72);padding:2px 6px;border-radius:3px}
+
+  #err{position:fixed;inset:0;display:none;place-content:center;text-align:center;
+    padding:40px;background:#10130F;font-size:14px;line-height:1.7}
+  #err code{color:var(--warn)}
+</style>
+</head>
+<body>
+<div id="cv"></div>
+
+<div id="hud" class="panel">
+  <h1>Dog locomotion — gauntlet</h1>
+  <div class="sub">world-anchored footfalls · 18-bone rig · sagittal 2-link IK</div>
+  <table id="t"></table>
+  <table id="legs"></table>
+</div>
+
+<div id="tag" class="panel">
+  <b id="modeName">NEW</b><br>
+  <span id="camName">review</span><br>
+  <span id="fps">–</span>
+</div>
+
+<div id="keys" class="panel">
+  <b>space</b> pause &nbsp; <b>O</b> old/new gait &nbsp; <b>R</b> steady trot &nbsp; <b>T</b> slow-mo<br>
+  <b>A</b> hold = drive &nbsp; <b>B</b> hold = brake &nbsp; <b>[ ]</b> speed −/+<br>
+  <b>1 2 3</b> camera &nbsp; <b>F</b> swap main/inset &nbsp; <b>G</b> undulating ground<br>
+  <b>M</b> contact markers &nbsp; <b>H</b> hide panels
+</div>
+
+<div id="insetFrame"></div>
+<div id="insetLabel"></div>
+<div id="err"></div>
+
+<script src="../../vendor/three.min.js"></script>
+<script src="../../vendor/GLTFLoader.js"></script>
+<script>
+/* ===========================================================================
+   GAUNTLET PIECE — DOG LOCOMOTION
+   Reference: Muybridge, Animal Locomotion (1887), plates 703-717 (dog trot /
+   gallop) — the measurable claims taken from them are: a trot is two beats
+   with diagonal pairs; the trunk reaches its LOWEST point at mid-support of
+   each diagonal (a trot is a bouncing gait, not a vaulting one), so the trunk
+   oscillates TWICE per stride; the head is nearly stationary in space while
+   the trunk oscillates under it; the pad is flat on the ground for most of
+   support and the animal pivots over the toe at the end of it.
+
+   What condition.js already has and this file KEEPS verbatim:
+     · the phase driven by ground covered, not by a clock
+     · the stance/swing split with a duty factor of 0.62 -> 0.50
+     · the walk<->trot blend, the chest bend, the head leading the turn
+     · every measured RIG number
+
+   What this file ADDS (the four things the brief asked for):
+     1. FOOTFALLS ANCHORED IN THE WORLD.  A foot is nailed to a ground point
+        for the whole of its support phase and the leg is solved backwards to
+        it.  Once that is true, the trunk is FREE — it can bob, pitch, roll,
+        surge, lean and brake without the paws sliding, which is the single
+        change that makes every other item on the list possible.
+     2. ACCELERATION AND BRAKING.  Trunk pitch from d(speed)/dt, plus feet
+        planted further forward under braking (they prop) and further back
+        under drive, plus a crouch under both.
+     3. THE VERTICAL.  Withers and croup carry separate, phase-offset,
+        asymmetric compression curves — fast down, slower up — at twice the
+        stride rate; the difference between them IS the pitch oscillation.
+        The head is hung off the withers on a damped spring so it lags, which
+        is what a compliant neck does and why a real dog's head sits still.
+     4. PAWS ON THE GROUND.  A fourth bone per leg (measured pastern, see
+        below) holds the pad flat on the ground plane through support, rolls
+        the animal over the toe at the end of it, dorsiflexes for clearance in
+        swing, and follows the ground's slope if the ground is not flat.
+
+   Every number below marked MEASURED came out of dog.glb this morning, the
+   same way RIG's numbers did (scripts: _work/gauntlet/dog-measure.py and
+   dog-measure2.py).
+
+   ── KNOWN DEFECT, stated up front ──────────────────────────────────────────
+   One or two feet, phase-dependent, still tear a wedge of stretched skin
+   between the metatarsus and the pad.  It is NOT introduced by anything on
+   the list above, and it is worth being precise about what is known:
+     · it survives with the paw bone disabled (GAIT.pawGain = 0);
+     · it survives with the limb extension frozen (extMax = extMin = 1);
+     · it disappears entirely when every joint angle is frozen, so it is a
+       deformation artefact, not a pose one;
+     · and it is PRESENT IN condition.js's OWN WEIGHTS — open this page as
+       ?w=orig, which rebuilds the skin with the original column-only capture
+       and no paw bone, and all four pads are smeared blobs.
+   So this is a latent weakness in the existing weighting that a 3.4 m camera
+   exposes and the drill's 6-10 m camera never did.  The capture work below
+   fixes most of it; it does not fix all of it.  Anyone lifting this into
+   condition.js should treat the leg weighting as unfinished.
+   =========================================================================== */
+(function () {
+'use strict';
+
+var errBox = document.getElementById('err');
+function die(msg, e) {
+  errBox.style.display = 'grid';
+  errBox.innerHTML = msg + (e ? '<br><br><code>' + String(e && e.message || e) + '</code>' : '');
+  if (e) console.error(e);
+}
+if (!window.THREE) { die('three.js did not load from <code>../../vendor/three.min.js</code>.'); return; }
+if (!THREE.GLTFLoader) { die('GLTFLoader did not load from <code>../../vendor/GLTFLoader.js</code>.'); return; }
+console.log('three r' + THREE.REVISION);
+
+// ── small helpers, copied from condition.js so behaviour matches ───────────
+function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function smooth(a, b, x) {
+  if (a === b) return x < a ? 0 : 1;
+  var t = clamp((x - a) / (b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+function wrap1(x) { x = x % 1; return x < 0 ? x + 1 : x; }
+function V3(a) { return new THREE.Vector3(a[0], a[1], a[2]); }
+function fx(v, n) { return (v < 0 ? '' : ' ') + v.toFixed(n); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE RIG.  Everything not commented MEASURED is lifted verbatim from
+   condition.js.
+   ══════════════════════════════════════════════════════════════════════════ */
+var RIG = {
+  fwd:  [-0.2294, 0, 0.9733],
+  side: [ 0.9733, 0, 0.2294],
+  ground: -0.4546,
+  legCut: -0.127,
+
+  /* ph / phW CHANGED.  Two things:
+     (a) phW is the WALK, and the four-beat order it produced was FL,HL,FR,HR
+         — fore before hind down each side.  A dog walks in LATERAL SEQUENCE:
+         left hind, left fore, right hind, right fore.  The hind foot lands
+         and the fore on the same side lifts out of the spot it is about to
+         step into.  Fixed below.
+     (b) the offsets are stored UNWRAPPED so lerping walk->trot never takes
+         the long way round the circle (fl used to run 0.75 -> 0.00 through
+         0.375, which paraded a leg backwards through the blend).  Every pair
+         now travels the short way and the two hinds never coincide. */
+  legs: [
+    { id: 'fl', f:  0.205, s: -0.039, fore: 1, ph: 0.00, phW: -0.25 },
+    { id: 'fr', f:  0.184, s: -0.204, fore: 1, ph: 0.50, phW:  0.25 },
+    { id: 'hl', f: -0.322, s:  0.081, fore: 0, ph: 0.50, phW:  0.00 },
+    { id: 'hr', f: -0.385, s: -0.140, fore: 0, ph: 1.00, phW:  0.50 }
+  ],
+  jointY: { fore: -0.020, hind: -0.045 },
+  kneeY:  { fore: -0.235, hind: -0.215 },
+
+  /* MEASURED — the pastern, i.e. where the paw meets the leg.  Found by
+     slicing each leg column in 28 bands and looking for the height at which
+     the fore-aft span jumps (the pad is wider fore-aft than the metacarpus)
+     and the centroid steps forward.  The four legs answered independently:
+       fl -0.4077   fr -0.4078   hl -0.4194   hr -0.4195
+     Left and right agreeing to four decimals is the check that this is a real
+     anatomical boundary and not a threshold artefact. */
+  pasternY: { fore: -0.4077, hind: -0.4194 },
+
+  /* MEASURED — and this one mattered more than any other number here.
+
+     condition.js hangs `lo` directly below `up`, so the bone chain is a
+     straight vertical line dropped through the leg.  The scan's limb is not
+     straight: a hind column steps BACK as it descends and the pad comes
+     forward again under it.  The real hock is 0.020 behind that line and the
+     real pastern 0.057 behind it — so a 49-degree fold at the hock (which is
+     what holding a foot still while the trunk drops actually costs) was
+     rotating the lower leg about a pivot 7 cm off the joint, and tore a wedge
+     of stretched skin out of the near hind leg.
+
+     Centroid of the leg column in a +-0.016 slab at each joint height.  Left
+     and right answered independently and agree: knee -0.0204 / -0.0200,
+     pastern -0.0570 / -0.0571. */
+  kneeOff: { fore: { f:  0.0011, s: -0.0013 }, hind: { f: -0.0202, s:  0.0072 } },
+  pastOff: { fore: { f:  0.0438, s: -0.0091 }, hind: { f: -0.0570, s:  0.0161 } },
+
+  /* MEASURED — the footprint, fore-aft, as an offset from the leg's own axis.
+     A front pad sits AHEAD of its column, a hind pad sits BEHIND it. */
+  pad: { fore: [0.020, 0.082], hind: [-0.082, -0.022] },
+
+  legR:  0.092,
+  spine: { f: -0.100, y: 0.050, back: -0.280, front: 0.100 },
+  ears: [
+    { tip:   [-0.1487, 0.4546, 0.4012], axis: [0.0374, 0.8395, 0.5420],
+      pivot: [-0.1510, 0.3806, 0.3710] },
+    { tip:   [-0.0278, 0.4483, 0.3382], axis: [0.5567, 0.7886, 0.2611],
+      pivot: [-0.0594, 0.3758, 0.3234] }
+  ],
+  earFull: -0.055, earZero: -0.100, earReach: 0.062,
+  tail: { f: -0.487, s: 0.112, baseY: 0.020, tipY: -0.265, r: 0.130 }
+};
+var NECK = { u: [0.04994, 0.74222, 0.66830], base: [-0.163, 0.10, 0.22], top: [-0.170, 0.28, 0.31] };
+var HEAD_ZERO = 0.90, HEAD_FULL = 1.10;
+var M = 1.20;                                  // metres per normalised unit
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE CONSTANTS THIS PIECE ADDS OR CHANGES.  Everything tunable is here, in
+   one block, so it can be read off and lifted into condition.js.
+   Lengths marked (n) are normalised units — multiply by M for metres.
+   ══════════════════════════════════════════════════════════════════════════ */
+var GAIT = {
+  // ── the stride, unchanged from condition.js ─────────────────────────────
+  strideMin: 0.62, strideMax: 1.05,      // metres per stride, slow -> fast
+  strideAt:  2.40,                       // m/s at which strideMax is reached
+  dutyWalk:  0.62, dutyTrot: 0.50,
+  trotFrom:  1.05, trotTo:   1.65,       // m/s, the walk->trot blend window
+
+  // ── footfall placement ──────────────────────────────────────────────────
+  /* How far ahead of its own neutral column a foot is set down, as a fraction
+     of the ground the body covers while that foot is down.  0.5 centres the
+     support phase on the column, which is what makes the sweep symmetric. */
+  plantAhead: 0.50,
+  /* SINGLE-TRACKING.  At a walk a dog's feet fall in two lines; at a trot
+     they converge under the midline until she is nearly walking a tightrope.
+     Fraction of the leg's lateral offset removed at full trot. */
+  trackNarrow: 0.42,
+  /* Feet plant further FORWARD when she is braking (they prop) and further
+     back when she is driving.  Normalised units per m/s^2. */
+  plantPerAccel: 0.020, plantBiasMin: -0.060, plantBiasMax: 0.100,
+  /* Swing clearance, metres, walk -> trot.  Fore legs lift higher. */
+  /* Swing clearance.  0.105 was too high: lifting the foot that far shortens
+     the reach enough that the shoulder hits its cap through early swing, and
+     a colinear bind pose has to swing the upper bone a long way to bend the
+     knee at all.  0.072 clears the grass and keeps the shoulder inside 55°. */
+  liftWalk: 0.028, liftTrot: 0.072, liftForeBias: 1.15,
+
+  /* ── REACH.  This is the one place the rig fights back, and it is worth
+     being plain about why.
+
+     In the bind pose these two bones are COLINEAR — up at the joint, lo
+     directly below it, the paw directly below that — because that is where
+     the scan's leg column actually is.  So L1+L2 is exactly the standing
+     height of the shoulder, and a rigid two-link of that length cannot move
+     its foot one millimetre fore or aft without the shoulder dropping.  A
+     full-trot stance sweep is +-0.219 (n), which would need a shoulder drop
+     of 68 mm.  No rigid solution exists.
+
+     Nor should one.  A dog's forelimb has no bony attachment to the trunk at
+     all — the scapula slides over the ribcage, and most of the fore-aft
+     excursion comes from that slide, not from the shoulder joint.  The limb
+     is LONGEST at the extremes of the stroke and SHORTEST under the body:
+     measured limb-length variation across a trot stride is 15-20%.
+
+     So the limb telescopes, and it telescopes only when the natural two-link
+     range runs out, which is exactly at the extremes where a real limb is
+     extending anyway.  extMax is the ceiling; anything past it is slip, and
+     slip is reported. */
+  rideDrop: 0.030,                       // metres she carries lower at a trot than at a stand
+  reachMax: 0.995,                       // fraction of (L1+L2) before the limb starts to extend
+  reachMin: 0.520,
+  extMax: 1.135, extMin: 0.820,          // limb length, as a fraction of the bind length
+  abductCap: 0.36,                       // rad the whole limb may swing out of its plane
+  shoulderCap: 0.85,                     // rad — a safety net, not a routine limiter
+  kneeCap: 1.35,
+
+  // ── the paw ─────────────────────────────────────────────────────────────
+  pawGain: 1.0,                          // 0 disables the paw bone entirely (a bisect handle)
+  heelOffAt: 0.72,                       // fraction of support where the heel leaves
+  heelLift:  0.44,                       // rad the pastern rises by toe-off
+  touchTip:  0.10,                       // rad toes-up at the instant of contact
+  touchFlat: 0.10,                       // ... gone by this fraction of support
+  dorsi:     0.30,                       // rad toes-up at mid-swing
+
+  // ── the vertical, the pitch and the roll ────────────────────────────────
+  /* Trunk oscillation, metres, at full trot.  TWICE per stride, minimum at
+     mid-support of each diagonal pair.  The forehand carries ~60% of a dog
+     and its excursion is correspondingly bigger. */
+  bobCroup: 0.0165, bobWithers: 0.0215,
+  bobSkew: 0.46,                         // where in the half-stride the trunk bottoms out
+  croupLag: 0.055,                       // strides the croup trails the withers by
+  bobSpeedFrom: 0.35, bobSpeedTo: 2.10,  // m/s over which the bob ramps in
+  /* The trunk rolls once per stride, toward the supporting diagonal. */
+  roll: 0.045, rollPhase: 0.12,
+  /* Fore-aft surge: the body is pushed along in pulses, twice per stride. */
+  surge: 0.011,
+  /* A walk sways sideways once per stride instead of bouncing. */
+  sway: 0.016,
+
+  // ── acceleration and braking ────────────────────────────────────────────
+  accelTau: 0.13,                        // s, smoothing on d(speed)/dt
+  pitchPerAccel: 0.030,                  // rad per m/s^2, +ve = nose down
+  pitchCap: 0.17,
+  crouchPerAccel: 0.0032,                // metres of crouch per m/s^2, either sign
+  /* The head is hung off the withers on a damped spring.  A neck near 3 Hz
+     against a trot's ~4.5 Hz bob gives the lag that keeps a real dog's head
+     still while her body works underneath it. */
+  neckHz: 3.0, neckZeta: 0.42, neckCarry: 0.62,
+  headPitchPerLag: 3.4,                  // rad of head pitch per normalised unit of lag
+
+  // ── what the OLD code did, kept for the A/B ─────────────────────────────
+  oldAmpShoulder: 0.34, oldAmpKnee: 0.46, oldSwingAt: 2.40, oldBob: 0.012
+};
+
+/* Derived, once. */
+var SEG = {};
+(function () {
+  ['fore', 'hind'].forEach(function (k) {
+    var jy = RIG.jointY[k], ky = RIG.kneeY[k], py = RIG.pasternY[k];
+    var pad = RIG.pad[k], ko = RIG.kneeOff[k], po = RIG.pastOff[k];
+    /* Segment lengths and REST ANGLES.  With the joints on the real limb the
+       two segments no longer point straight down at bind, so the IK solves
+       for each segment's world angle and the rest angle is subtracted off to
+       get the bone's own rotation.  Convention throughout: a segment at world
+       angle phi points along (-sin phi) forward, (cos phi) down. */
+    SEG[k] = {
+      L1: Math.hypot(ko.f, jy - ky),                 // fore 0.2150  hind 0.1712
+      L2: Math.hypot(po.f - ko.f, ky - py),          // fore 0.1779  hind 0.2077
+      L3: py - RIG.ground,                           // fore 0.0469  hind 0.0351
+      a1: Math.atan2(-ko.f, jy - ky),                // fore -0.005  hind +0.118
+      a2: Math.atan2(-(po.f - ko.f), ky - py),       // fore -0.242  hind +0.178
+      jointY: jy, kneeY: ky, pasternY: py, kneeOff: ko, pastOff: po,
+      /* the pad, re-expressed relative to the PAW BONE rather than the leg
+         axis, because the paw bone has moved onto the real pastern */
+      padBack: pad[0] - po.f, padFront: pad[1] - po.f,
+      padMid: (pad[0] + pad[1]) / 2 - po.f,
+      padCentreF: (pad[0] + pad[1]) / 2
+    };
+    SEG[k].reach = SEG[k].L1 + SEG[k].L2;
+  });
+})();
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SCENE
+   ══════════════════════════════════════════════════════════════════════════ */
+var K = { grass: '#6E8C4A', grassAlt: '#668543', grassDark: '#4E6A35',
+          grassLite: '#87A05E', sky: '#C8D6E2' };
+
+var host = document.getElementById('cv');
+var renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;   // the shell's tone curve
+renderer.toneMappingExposure = 1.06;
+host.appendChild(renderer.domElement);
+
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(K.sky);
+scene.fog = new THREE.Fog(K.sky, 26, 92);
+
+// the drill's lighting, verbatim out of condition.js relight()
+var hemi = new THREE.HemisphereLight(K.sky, K.grassDark, 0.62); scene.add(hemi);
+var sun = new THREE.DirectionalLight(0xffffff, 0.92); sun.position.set(5, 7.5, 3); scene.add(sun);
+var fill = new THREE.DirectionalLight(0xffffff, 0.16); fill.position.set(-6, 4, -5); scene.add(fill);
+var rim = new THREE.DirectionalLight(0xffffff, 0.10); rim.position.set(0, 3, -9); scene.add(rim);
+
+// the drill's lens
+var camMain = new THREE.PerspectiveCamera(52, 1, 0.12, 260);
+var camSide = new THREE.PerspectiveCamera(52, 1, 0.12, 260);
+
+/* ── the field.  grassTexture() ported from condition.js: the mown stripes
+      are the only reason travel reads as travel. ─────────────────────────── */
+function grassTexture() {
+  var c = document.createElement('canvas');
+  c.width = c.height = 256;
+  var x = c.getContext('2d');
+  x.fillStyle = K.grass; x.fillRect(0, 0, 256, 256);
+  x.fillStyle = K.grassAlt;
+  for (var i = 0; i < 256; i += 64) x.fillRect(0, i, 256, 32);
+  x.globalAlpha = 0.06;
+  for (var k = 0; k < 2600; k++) {
+    x.fillStyle = (k % 2) ? K.grassDark : K.grassLite;
+    x.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+  }
+  var t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(22, 22);
+  t.anisotropy = 4;
+  return t;
+}
+
+/* THE GROUND.  Flat is the drill's field and the default.  The swell is here
+   only to PROVE the paws conform: press G and the pads tilt to the slope
+   instead of hovering over it. */
+var GROUND = {
+  swell: false,
+  amp: 0.085,
+  y: function (x, z) {
+    if (!this.swell) return 0;
+    return this.amp * Math.sin(x * 0.55) * Math.cos(z * 0.42);
+  },
+  // d(height)/d(distance) along a unit heading (dx,dz)
+  slope: function (x, z, dx, dz) {
+    if (!this.swell) return 0;
+    var gx = this.amp * 0.55 * Math.cos(x * 0.55) * Math.cos(z * 0.42);
+    var gz = -this.amp * 0.42 * Math.sin(x * 0.55) * Math.sin(z * 0.42);
+    return gx * dx + gz * dz;
+  }
+};
+
+var groundGeo = new THREE.PlaneGeometry(140, 140, 110, 110);
+groundGeo.rotateX(-Math.PI / 2);
+var groundBase = groundGeo.attributes.position.array.slice();
+var groundMesh = new THREE.Mesh(groundGeo,
+  new THREE.MeshLambertMaterial({ map: grassTexture() }));
+scene.add(groundMesh);
+/* The field follows her, snapped to a whole mown stripe so the pattern never
+   slides: 140 m over 22 repeats is one tile every 6.3636 m.  Without this she
+   trots off the edge of the plane in about a minute and the horizon vanishes. */
+var TILE = 140 / 22;
+var groundAt = { x: 0, z: 0 };
+function reshapeGround() {
+  var p = groundGeo.attributes.position, a = p.array;
+  for (var i = 0; i < a.length; i += 3) {
+    a[i + 1] = GROUND.y(groundBase[i] + groundAt.x, groundBase[i + 2] + groundAt.z);
+  }
+  p.needsUpdate = true;
+  groundGeo.computeVertexNormals();
+}
+function followGround(x, z) {
+  var nx = Math.round(x / TILE) * TILE, nz = Math.round(z / TILE) * TILE;
+  if (nx === groundAt.x && nz === groundAt.z) return;
+  groundAt.x = nx; groundAt.z = nz;
+  groundMesh.position.set(nx, 0, nz);
+  if (GROUND.swell) reshapeGround();
+}
+reshapeGround();
+
+// contact blobs — cheap, and they make ground contact legible in a screenshot
+function blobTexture() {
+  var c = document.createElement('canvas'); c.width = c.height = 96;
+  var x = c.getContext('2d');
+  var g = x.createRadialGradient(48, 48, 2, 48, 48, 46);
+  g.addColorStop(0, 'rgba(24,30,20,0.62)');
+  g.addColorStop(0.55, 'rgba(24,30,20,0.30)');
+  g.addColorStop(1, 'rgba(24,30,20,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 96, 96);
+  return new THREE.CanvasTexture(c);
+}
+var blobTex = blobTexture();
+function makeBlob(size) {
+  var m = new THREE.Mesh(new THREE.PlaneGeometry(size, size),
+    new THREE.MeshBasicMaterial({ map: blobTex, transparent: true,
+      depthWrite: false, opacity: 0.9 }));
+  m.rotation.x = -Math.PI / 2;
+  m.renderOrder = 2;
+  scene.add(m);
+  return m;
+}
+var bodyBlob = makeBlob(1.15);
+var pawBlob = [makeBlob(0.30), makeBlob(0.30), makeBlob(0.30), makeBlob(0.30)];
+
+/* Footfall markers: a ring dropped at every plant.  If the paw slides, the
+   ring and the paw separate, on camera. */
+var markers = [], MARK_N = 26, markI = 0;
+var markGroup = new THREE.Group(); scene.add(markGroup);
+(function () {
+  var ringGeo = new THREE.RingGeometry(0.052, 0.070, 20);
+  ringGeo.rotateX(-Math.PI / 2);
+  for (var i = 0; i < MARK_N; i++) {
+    var m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+      color: 0xF2E9C8, transparent: true, opacity: 0, depthWrite: false }));
+    m.renderOrder = 3;
+    m.visible = false;
+    markGroup.add(m); markers.push({ mesh: m, born: -99 });
+  }
+})();
+function dropMark(p) {
+  var m = markers[markI]; markI = (markI + 1) % MARK_N;
+  m.mesh.position.set(p.x, p.y + 0.006, p.z);
+  m.mesh.visible = true;
+  m.born = T.now;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BUILDING THE SKINNED DOG.  bakeGeometry / buildWeights / buildSkeleton are
+   condition.js's, with the paw bone added in the two places it needs to be.
+   ══════════════════════════════════════════════════════════════════════════ */
+var FWD = V3(RIG.fwd), SIDEV = V3(RIG.side);
+var U = V3(NECK.u), BASE = V3(NECK.base), TOPV = V3(NECK.top);
+var baseU = BASE.dot(U), spanU = TOPV.dot(U) - baseU;
+var axSide = SIDEV.clone().normalize();
+var axUp = new THREE.Vector3(0, 1, 0);
+
+function at(f, s, y) {
+  return new THREE.Vector3(FWD.x * f + SIDEV.x * s, y, FWD.z * f + SIDEV.z * s);
+}
+function centreAt(t) { return BASE.clone().lerp(TOPV, t); }
+
+function bakeGeometry(gltf) {
+  var src = null;
+  gltf.scene.traverse(function (o) { if (o.isMesh && !src) src = o; });
+  if (!src) throw new Error('dog.glb carries no mesh');
+  src.updateMatrixWorld(true);
+  var geom = src.geometry.clone();
+  geom.applyMatrix4(src.matrixWorld);
+  geom.computeBoundingBox();
+  var bb = geom.boundingBox;
+  var ctr = bb.getCenter(new THREE.Vector3());
+  var size = bb.getSize(new THREE.Vector3());
+  var sc = 1 / Math.max(size.x, size.y, size.z);
+  geom.applyMatrix4(new THREE.Matrix4().makeScale(sc, sc, sc)
+    .multiply(new THREE.Matrix4().makeTranslation(-ctr.x, -ctr.y, -ctr.z)));
+  geom.computeBoundingBox();
+  if (Math.abs(geom.boundingBox.min.y - RIG.ground) > 0.02) {
+    throw new Error('dog.glb no longer matches the measured rig (ground ' +
+      geom.boundingBox.min.y.toFixed(4) + ', expected ' + RIG.ground + ')');
+  }
+  var mat = src.material.clone();
+  mat.skinning = true;
+  mat.side = THREE.FrontSide;
+  return { geom: geom, mat: mat };
+}
+
+/* PAW_BLEND — how wide the weight ramp across the pastern is.  The paw is
+   only 0.047 tall on the fore leg, so this has to stay well inside it or the
+   ramp reaches the ground and the toes stop rotating with the pad. */
+var PAW_BLEND = 0.020;
+/* MEASURED: the furthest pad vertex from its leg's own vertical axis is
+   0.0917 (fl toes).  The capture radius grows to this near the ground so the
+   whole foot travels with the leg instead of only its heel. */
+var PAD_REACH = 0.112;
+/* ?w=orig rebuilds the skin with condition.js's EXACT leg weights — the
+   column-only capture at legR, feathered from 0.74, and no paw bone getting
+   any vertices — so any deformation artefact can be attributed rather than
+   argued about. */
+var ORIG_WEIGHTS = /(\?|&)w=orig/.test(location.search);
+
+/* Bone order, extended.  0..13 are condition.js's, untouched:
+     0 root  1 chest  2 head  3 tail  4,5 ears
+     6..9 fore legs (fl up/lo, fr up/lo)   10..13 hind legs
+   and appended, so no existing index moves:
+     14 fl paw  15 fr paw  16 hl paw  17 hr paw                     */
+function buildWeights(geom) {
+  var pos = geom.attributes.position, n = pos.count;
+  var si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+  var p = new THREE.Vector3(), d3 = new THREE.Vector3(), q3 = new THREE.Vector3();
+  var legs = RIG.legs, i, k, e;
+  var tailF = RIG.tail.f, tailS = RIG.tail.s;
+  var ears = [];
+  for (e = 0; e < RIG.ears.length; e++) {
+    ears.push({ tip: V3(RIG.ears[e].tip), ax: V3(RIG.ears[e].axis).normalize() });
+  }
+
+  for (i = 0; i < n; i++) {
+    p.fromBufferAttribute(pos, i);
+    var f = p.x * FWD.x + p.z * FWD.z;
+    var s = p.x * SIDEV.x + p.z * SIDEV.z;
+    var y = p.y, o = i * 4;
+
+    var wChest = smooth(RIG.spine.back, RIG.spine.front, f);
+    si[o] = 0; sw[o] = 1 - wChest;
+    si[o + 1] = 1; sw[o + 1] = wChest;
+
+    var sN = (p.dot(U) - baseU) / spanU;
+    var wHead = smooth(HEAD_ZERO, HEAD_FULL, sN);
+    if (wHead > 0.002) {
+      var bestW = 0, who = -1;
+      for (e = 0; e < ears.length; e++) {
+        d3.set(p.x - ears[e].tip.x, p.y - ears[e].tip.y, p.z - ears[e].tip.z);
+        var alng = d3.dot(ears[e].ax);
+        q3.copy(ears[e].ax).multiplyScalar(alng);
+        if (d3.sub(q3).length() > RIG.earReach) continue;
+        var w = smooth(RIG.earZero, RIG.earFull, alng);
+        if (w > bestW) { bestW = w; who = e; }
+      }
+      if (who >= 0 && bestW > 0.002) {
+        si[o] = 4 + who;  sw[o] = bestW;
+        si[o + 1] = 2;    sw[o + 1] = (1 - bestW) * wHead;
+        si[o + 2] = 1;    sw[o + 2] = (1 - bestW) * (1 - wHead);
+        continue;
+      }
+      si[o] = 2;     sw[o] = wHead;
+      si[o + 1] = 1; sw[o + 1] = 1 - wHead;
+      continue;
+    }
+
+    var bestD = 1e9, bestK = -1;
+    for (k = 0; k < legs.length; k++) {
+      var dd = Math.hypot(f - legs[k].f, s - legs[k].s);
+      if (dd < bestD) { bestD = dd; bestK = k; }
+    }
+    var dTail = Math.hypot(f - tailF, s - tailS);
+    if (dTail < bestD && y < RIG.tail.baseY) {
+      var wT = smooth(RIG.tail.baseY, RIG.tail.tipY, y) *
+               (1 - smooth(RIG.tail.r * 0.70, RIG.tail.r, dTail));
+      if (wT > 0.002) { si[o] = 3; sw[o] = wT; si[o + 1] = 0; sw[o + 1] = 1 - wT; }
+      continue;
+    }
+    if (bestK < 0) continue;
+    var L = legs[bestK], S = SEG[L.fore ? 'fore' : 'hind'];
+
+    /* CAPTURE, and it has to be CONTINUOUS in y.
+
+       RIG.legR = 0.092 is measured off the leg COLUMN, about the leg's own
+       vertical axis, and below the pastern that is the wrong thing to measure
+       against: the pad juts clear of the column — a front pad sits up to
+       0.092 ahead of its axis, a hind pad the same behind — so a column-shaped
+       capture leaves the toes welded to the trunk while the heel travels with
+       the leg, and the foot shears into a blade.
+
+       Switching to a pad-shaped capture below some height fixes the toes and
+       introduces something worse: a vertex at the back of a hind foot jumps
+       from weight 0.06 to weight 1.0 across that height, and the mesh tears
+       into a sheet of stretched skin between the two.  It has to be a slide,
+       not a switch — so the capture CENTRE walks down the measured limb, from
+       the leg axis at the knee to the measured pastern below it, on the one
+       radius.  No discontinuity anywhere, and the whole foot comes with it. */
+    /* CAPTURE.  One continuous function of (distance from the axis, height),
+       and it took three wrong answers to get here, all of which showed up as
+       the same thing: a sheet of stretched skin spanning from the hock to the
+       toes on the hind leg.
+
+       RIG.legR = 0.092 is measured about the leg's own VERTICAL axis, and the
+       pad juts clear of that column — a front pad reaches 0.092 ahead of its
+       axis and a hind pad the same behind — so at legR the toes get a feather
+       weight of about 0.2 while the heel gets 1.0, and any rotation at all
+       tears the difference open.  What does NOT work:
+         · moving the capture centre onto the pad — it reaches into the belly
+           and the crotch at that height and drags trunk along with the foot;
+         · max() of a column term and a pad term — wherever the two cross,
+           weight jumps and the mesh tears at the crossing instead;
+       What works is leaving the centre on the axis and letting the RADIUS
+       grow towards the ground.  Below the pastern there is nothing but foot,
+       so a wider radius there cannot capture anything it should not, and one
+       radius means one weight, smooth everywhere. */
+    var R = RIG.legR, feather = 0.74;
+    if (!ORIG_WEIGHTS) {
+      /* Ramped over the WHOLE lower segment, not just the last 75 mm.  The
+         hind column bulges 0.066 behind its own axis at mid-metatarsus —
+         right at the edge of a 0.092 capture — so the back of the metatarsus
+         was feathering to nothing and welding itself to the trunk, which is
+         where the last sheet of stretched skin was hanging from. */
+      var padRamp = smooth(S.kneeY, S.pasternY, y);
+      R = RIG.legR + (PAD_REACH - RIG.legR) * padRamp;
+      feather = 0.86;
+    }
+    if (bestD > R) continue;
+    var wCap = 1 - smooth(R * feather, R, bestD);
+    if (wCap <= 0.002) continue;
+
+    var wLeg = smooth(S.jointY, RIG.legCut, y) * wCap;
+    if (wLeg <= 0.002) continue;
+
+    /* THE PAW SPLIT.  The ramp sits ABOVE the pastern, in the metacarpus,
+       not across it: the pad is only 0.047 tall on a fore leg, so a ramp
+       centred on the pastern spans three quarters of the paw and the pad
+       bends instead of hinging.  Everything below the pastern is rigid pad. */
+    var wPaw  = ORIG_WEIGHTS ? 0
+              : smooth(S.pasternY + PAW_BLEND, S.pasternY + 0.002, y);
+    var wKnee = smooth(S.kneeY + 0.055, S.kneeY - 0.055, y) * (1 - wPaw);
+    var wUp   = 1 - wKnee - wPaw;
+
+    var upper = 6 + bestK * 2, lower = upper + 1, paw = 14 + bestK;
+    si[o]     = L.fore ? 1 : 0;  sw[o]     = 1 - wLeg;
+    si[o + 1] = upper;           sw[o + 1] = wLeg * wUp;
+    si[o + 2] = lower;           sw[o + 2] = wLeg * wKnee;
+    si[o + 3] = paw;             sw[o + 3] = wLeg * wPaw;
+  }
+  geom.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+  geom.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+}
+
+var boneOf = {}, bones = null;
+function buildSkeleton(geom, mat) {
+  var list = [], i;
+  var root = new THREE.Bone(); list.push(root);
+  var chest = new THREE.Bone();
+  chest.position.copy(at(RIG.spine.f, 0, RIG.spine.y));
+  root.add(chest); list.push(chest);
+  var head = new THREE.Bone();
+  head.position.copy(centreAt(HEAD_ZERO)).sub(chest.position);
+  chest.add(head); list.push(head);
+  var tail = new THREE.Bone();
+  tail.position.copy(at(RIG.tail.f, RIG.tail.s, RIG.tail.baseY));
+  root.add(tail); list.push(tail);
+  var earB = [];
+  for (i = 0; i < RIG.ears.length; i++) {
+    var ear = new THREE.Bone();
+    ear.position.copy(V3(RIG.ears[i].pivot)).sub(centreAt(HEAD_ZERO));
+    head.add(ear); list.push(ear); earB.push(ear);
+  }
+  for (i = 0; i < RIG.legs.length; i++) {
+    var L = RIG.legs[i], S = SEG[L.fore ? 'fore' : 'hind'];
+    var par = L.fore ? chest : root;
+    var up = new THREE.Bone();
+    up.position.copy(at(L.f, L.s, S.jointY));
+    if (L.fore) up.position.sub(chest.position);
+    par.add(up); list.push(up);
+    var lo = new THREE.Bone();
+    // the knee, on the measured limb rather than straight below the shoulder
+    lo.position.copy(at(S.kneeOff.f, S.kneeOff.s, S.kneeY - S.jointY));
+    up.add(lo); list.push(lo);
+    boneOf[L.id] = { up: up, lo: lo };
+  }
+  // ── appended: the paw, hung at the measured pastern ─────────────────────
+  for (i = 0; i < RIG.legs.length; i++) {
+    var L2 = RIG.legs[i], S2 = SEG[L2.fore ? 'fore' : 'hind'];
+    var pw = new THREE.Bone();
+    pw.position.copy(at(S2.pastOff.f - S2.kneeOff.f,
+                        S2.pastOff.s - S2.kneeOff.s,
+                        S2.pasternY - S2.kneeY));
+    boneOf[L2.id].lo.add(pw); list.push(pw);
+    boneOf[L2.id].paw = pw;
+    // bind offsets, kept so the limb can telescope by moving joints, not scaling
+    boneOf[L2.id].loBind = boneOf[L2.id].lo.position.clone();
+    boneOf[L2.id].pawBind = pw.position.clone();
+  }
+
+  var mesh = new THREE.SkinnedMesh(geom, mat);
+  mesh.add(root);
+  mesh.updateMatrixWorld(true);
+  mesh.bind(new THREE.Skeleton(list));
+  mesh.normalizeSkinWeights();
+  mesh.frustumCulled = false;
+  bones = list;
+  boneOf.root = root; boneOf.chest = chest; boneOf.head = head;
+  boneOf.tail = tail; boneOf.ears = earB;
+  return mesh;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   STATE
+   ══════════════════════════════════════════════════════════════════════════ */
+var D = {
+  x: -7, z: 0, yaw: Math.PI / 2, sp: 0, ground: 0, accel: 0, accelRaw: 0,
+  turnRate: 0, gait: 0, bend: 0, lean: 0,
+  bodyY: 0, pitch: 0, roll: 0, surgeF: 0, swayS: 0,
+  headY: 0, headV: 0, headLag: 0,
+  wither: 0, croup: 0
+};
+var LEG = RIG.legs.map(function () {
+  return {
+    planted: false, p: 0, u: 0,
+    anchor: new THREE.Vector3(),      // the world point the pad is nailed to
+    anchorToe: new THREE.Vector3(),   // ... and the toe, once the heel is off
+    lift: new THREE.Vector3(),        // where it left the ground
+    land: new THREE.Vector3(),        // where it is going
+    contact: new THREE.Vector3(),     // where the pad actually IS, measured
+    target: new THREE.Vector3(), dbg: null,
+    prevContact: new THREE.Vector3(), hadContact: false,
+    slip: 0, slipAvg: 0, slipPeak: 0, drift: 0, driftMax: 0,
+    reachClamped: false, ext: 1, latErr: 0
+  };
+});
+
+var T = { now: 0, dt: 0, paused: false, slow: false, mode: 'new', steady: false,
+          straight: false, hold: null, markersOn: true, panels: true,
+          fps: 0, fpsAcc: 0, fpsN: 0, fpsT: 0 };
+var CAM = { which: 0, swap: false, pos: new THREE.Vector3(), aim: new THREE.Vector3(),
+            side: 1, ready: false };
+var MEAS = { lastWrapX: 0, lastWrapZ: 0, haveWrap: false, strideMeas: 0, strideAvg: 0 };
+var KEYS = {};
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE DRIVE.  A scripted run that keeps crossing the view and, more to the
+   point, keeps accelerating and braking — because a lean you cannot trigger
+   is a lean nobody can judge.
+   ══════════════════════════════════════════════════════════════════════════ */
+var RUN = { leg: 0, t: 0, target: 0, turning: 0, wantYaw: Math.PI / 2, turnCap: 1.5 };
+var SCRIPT = [
+  { sp: 2.30, hold: 2.6, note: 'trot, cruise' },
+  { sp: 0.30, hold: 1.1, note: 'BRAKE to a stop' },
+  { sp: 2.45, hold: 2.2, note: 'DRIVE off the mark' },
+  { sp: 0.85, hold: 1.6, note: 'walk' },
+  { sp: 2.30, hold: 2.4, note: 'trot' },
+  { sp: 0.00, hold: 1.2, note: 'BRAKE, stand' }
+];
+
+function drive(dt) {
+  var prevSp = D.sp;
+
+  if (T.hold != null) {
+    RUN.target = T.hold;
+  } else if (T.steady) {
+    RUN.target = 2.20;
+  } else {
+    RUN.t += dt;
+    var seg = SCRIPT[RUN.leg];
+    RUN.target = seg.sp;
+    if (RUN.t > seg.hold + 1.2) { RUN.t = 0; RUN.leg = (RUN.leg + 1) % SCRIPT.length; }
+  }
+  if (KEYS['a']) RUN.target = 2.80;
+  if (KEYS['b']) RUN.target = 0.00;
+
+  // turn round before she leaves the field
+  var ahead = 12.5;
+  var nx = D.x + Math.sin(D.yaw) * ahead;
+  if (!T.straight && (nx > 13 || nx < -13)) {
+    RUN.wantYaw = (Math.abs(D.yaw - Math.PI / 2) < 0.9) ? -Math.PI / 2 : Math.PI / 2;
+  }
+  if (T.straight) { RUN.wantYaw = D.yaw; D.x = clamp(D.x, -300, 300); }
+
+  var dy = ((RUN.wantYaw - D.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+  /* 1.5 rad/s.  condition.js caps the dog at 3.2, which is a scramble, not a
+     trot; a dog trotting a circle turns at about a quarter of that. */
+  var applied = clamp(dy, -RUN.turnCap * dt, RUN.turnCap * dt);
+  D.yaw += applied;
+  D.turnRate = applied / Math.max(dt, 1e-4);
+
+  // the same acceleration clamps stepDog() uses: -5 braking, +3.4 driving
+  D.sp += clamp(RUN.target - D.sp, -5 * dt, 3.4 * dt);
+  if (D.sp < 0.001) D.sp = 0;
+
+  var wasX = D.x, wasZ = D.z;
+  D.x += Math.sin(D.yaw) * D.sp * dt;
+  D.z += Math.cos(D.yaw) * D.sp * dt;
+
+  /* THE PHASE DRIVER, unchanged: ground covered, never a clock. */
+  var moved = Math.hypot(D.x - wasX, D.z - wasZ);
+  D.ground = moved / Math.max(dt, 1e-4);
+  var stride = strideOf(D.ground);
+  var before = D.gait;
+  D.gait = wrap1(D.gait + moved / stride);
+  if (D.gait < before) {                       // a stride just closed — measure it
+    if (MEAS.haveWrap) {
+      MEAS.strideMeas = Math.hypot(D.x - MEAS.lastWrapX, D.z - MEAS.lastWrapZ);
+      MEAS.strideAvg = MEAS.strideAvg ? lerp(MEAS.strideAvg, MEAS.strideMeas, 0.34)
+                                      : MEAS.strideMeas;
+    }
+    MEAS.lastWrapX = D.x; MEAS.lastWrapZ = D.z; MEAS.haveWrap = true;
+  }
+
+  // acceleration, smoothed — this is what the lean reads
+  D.accelRaw = (D.sp - prevSp) / Math.max(dt, 1e-4);
+  var kA = 1 - Math.exp(-dt / GAIT.accelTau);
+  D.accel = lerp(D.accel, D.accelRaw, kA);
+}
+
+function trotnessOf(sp) { return smooth(GAIT.trotFrom, GAIT.trotTo, sp); }
+function dutyOf(sp) { return lerp(GAIT.dutyWalk, GAIT.dutyTrot, trotnessOf(sp)); }
+function strideOf(sp) {
+  return lerp(GAIT.strideMin, GAIT.strideMax, clamp(sp / GAIT.strideAt, 0, 1));
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE TRUNK.  Everything here used to be one sine on dogRoot.position.y.
+   ══════════════════════════════════════════════════════════════════════════ */
+/* Asymmetric compression.  A sine has the trunk falling and rising at the
+   same rate; a body with mass in it drops onto the limb quickly and is
+   returned slowly.  Two half-cosines joined at bobSkew, C1 at the join. */
+function compress(w) {
+  var c = GAIT.bobSkew;
+  if (w < c) return 0.5 - 0.5 * Math.cos(Math.PI * w / c);
+  return 0.5 + 0.5 * Math.cos(Math.PI * (w - c) / (1 - c));
+}
+
+var SHOULDER_F = (RIG.legs[0].f + RIG.legs[1].f) / 2;   //  0.1945
+var HIP_F      = (RIG.legs[2].f + RIG.legs[3].f) / 2;   // -0.3535
+var SPAN_F     = SHOULDER_F - HIP_F;                    //  0.5480
+
+function poseTrunk(dt) {
+  var sp = D.ground;
+  var tro = trotnessOf(sp);
+  var amp = smooth(GAIT.bobSpeedFrom, GAIT.bobSpeedTo, sp);
+
+  /* TWICE PER STRIDE, bottoming out at mid-support of each diagonal pair.
+     With the trot offsets as they are, the fl/hr pair is in support from
+     phase 0 to duty, so its mid-support is at duty/2 = 0.25. */
+  var duty = dutyOf(sp);
+  var w0 = wrap1(2 * (D.gait - duty / 2 + 0.25));
+  var wW = compress(wrap1(w0));
+  var wC = compress(wrap1(w0 - GAIT.croupLag * 2));
+
+  var witherDrop = GAIT.bobWithers * amp * wW / M;      // normalised units
+  var croupDrop  = GAIT.bobCroup   * amp * wC / M;
+  D.wither = witherDrop * M; D.croup = croupDrop * M;
+
+  /* The pitch is not a separate invention: it is the withers and the croup
+     being at different heights, resolved about the root pivot at f = 0. */
+  var pitchOsc = (witherDrop - croupDrop) / SPAN_F;
+  var y0 = -croupDrop - HIP_F * pitchOsc;
+
+  // acceleration and braking
+  var pitchA = clamp(-D.accel * GAIT.pitchPerAccel, -GAIT.pitchCap, GAIT.pitchCap);
+  var crouch = -Math.abs(D.accel) * GAIT.crouchPerAccel / M;
+  /* She carries lower at a trot than she does standing square.  This is not
+     decoration: it is what centres the limb's working range so the extension
+     above only has to reach at the extremes of the stroke. */
+  var ride = -GAIT.rideDrop * tro / M;
+
+  D.pitch = pitchOsc + pitchA;
+  D.bodyY = y0 + crouch + ride;
+
+  // roll, once per stride, toward the diagonal that is carrying her
+  D.roll = GAIT.roll * amp * tro * Math.sin(2 * Math.PI * (D.gait - GAIT.rollPhase));
+  // a walk sways instead of bouncing
+  D.swayS = GAIT.sway * amp * (1 - tro) * Math.sin(2 * Math.PI * (D.gait - 0.10)) / M;
+  // fore-aft surge, twice a stride
+  D.surgeF = GAIT.surge * amp * tro * Math.sin(4 * Math.PI * (D.gait - 0.05)) / M;
+
+  // the turn, as condition.js has it
+  var k = 1 - Math.pow(0.004, dt);
+  D.bend = lerp(D.bend, clamp(D.turnRate * 0.30, -0.42, 0.42), k);
+  D.lean = lerp(D.lean, clamp(D.turnRate * sp * 0.055, -0.18, 0.18), k);
+
+  // ── write it onto the skeleton ──────────────────────────────────────────
+  var root = boneOf.root, chest = boneOf.chest;
+  root.position.set(FWD.x * D.surgeF + SIDEV.x * D.swayS,
+                    D.bodyY,
+                    FWD.z * D.surgeF + SIDEV.z * D.swayS);
+  qA.setFromAxisAngle(axSide, D.pitch);
+  qB.setFromAxisAngle(FWD, D.roll);
+  root.quaternion.copy(qA).multiply(qB);
+
+  /* The forehand takes a share of the pitch on top, so the shoulders lead the
+     brake instead of the whole animal tipping like a plank. */
+  qA.setFromAxisAngle(axUp, D.bend);
+  qB.setFromAxisAngle(FWD, -D.lean);
+  qC.setFromAxisAngle(axSide, pitchA * 0.34);
+  chest.quaternion.copy(qA).multiply(qB).multiply(qC);
+}
+
+/* THE NECK.  A damped spring, sub-stepped so a long frame cannot blow it up.
+   The head is heavy and the neck is compliant, so at a trot's ~4.5 Hz the
+   head simply does not follow — which is why a real dog's head sits still in
+   the air while her shoulders work up and down underneath it. */
+function poseHeadBob(dt) {
+  var target = D.bodyY - SHOULDER_F * D.pitch;      // the withers, normalised
+  var w = 2 * Math.PI * GAIT.neckHz, z = GAIT.neckZeta;
+  var n = Math.max(1, Math.ceil(dt / (1 / 240)));
+  var h = dt / n;
+  for (var i = 0; i < n; i++) {
+    D.headV += (w * w * (target - D.headY) - 2 * z * w * D.headV) * h;
+    D.headY += D.headV * h;
+  }
+  D.headLag = D.headY - target;
+
+  /* The head carries only part of the trunk's motion (neckCarry), and the
+     rest shows up as the neck pitching — the nod. */
+  var nod = clamp(-D.headLag * GAIT.headPitchPerLag, -0.30, 0.30);
+  var dip = 0.06 * smooth(0.4, 2.2, D.ground);      // a moving dog carries her head lower
+  var yaw = clamp((D.turnRate || 0) * 0.26, -0.45, 0.45);
+  qA.setFromAxisAngle(axUp, yaw);
+  qB.setFromAxisAngle(axSide, dip + nod * GAIT.neckCarry);
+  boneOf.head.quaternion.copy(qA).multiply(qB);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE LEGS.
+
+   The old function chose two joint ANGLES from the phase and hoped the foot
+   ended up in the right place.  This one chooses where the FOOT is — a world
+   point for the whole of support — and solves the two joints backwards to it.
+   That is the whole difference.  A foot that is nailed to the ground cannot
+   skate no matter what the trunk does, which is why the trunk above is free
+   to bob, pitch, roll, surge and brake.
+   ══════════════════════════════════════════════════════════════════════════ */
+var qA = new THREE.Quaternion(), qB = new THREE.Quaternion(), qC = new THREE.Quaternion();
+var vJ = new THREE.Vector3(), vA = new THREE.Vector3(), vF = new THREE.Vector3(),
+    vDn = new THREE.Vector3(), vD = new THREE.Vector3(), vT = new THREE.Vector3(),
+    vTmp = new THREE.Vector3(), vTmp2 = new THREE.Vector3(), mTmp = new THREE.Matrix4();
+
+/* Where, in HER frame, this foot is set down. */
+function plantLocal(i, sp, out) {
+  var L = RIG.legs[i], S = SEG[L.fore ? 'fore' : 'hind'];
+  var tro = trotnessOf(sp);
+  var duty = dutyOf(sp), stride = strideOf(sp);
+  var sweep = duty * stride / M;                        // normalised, whole support
+  var bias = clamp(-D.accel * GAIT.plantPerAccel, GAIT.plantBiasMin, GAIT.plantBiasMax);
+  /* padCentreF, not 0: the neutral place for a foot is under its own pad,
+     and a front pad sits 0.051 ahead of its column. */
+  out.f = L.f + S.padCentreF + sweep * GAIT.plantAhead + bias;
+  out.s = L.s * (1 - GAIT.trackNarrow * tro);           // single-tracking
+  return out;
+}
+var _pl = { f: 0, s: 0 };
+
+/* world position of a body point (f, s) at a given world pose */
+function bodyToWorld(f, s, x, z, yaw, out) {
+  // the model's fwd axis is turned to point along yaw
+  var c = Math.cos(yaw), si = Math.sin(yaw);
+  // in her frame: forward = (sin yaw, cos yaw), left = (cos yaw, -sin yaw)
+  out.set(x + si * f + c * s, 0, z + c * f - si * s);
+  out.y = GROUND.y(out.x, out.z);
+  return out;
+}
+
+function legPhase(i, sp) {
+  var L = RIG.legs[i];
+  var tro = trotnessOf(sp);
+  var off = lerp(L.phW, L.ph, tro);
+  return wrap1(D.gait + off);
+}
+
+/* The paw's pitch in the world, and which point of the pad is on the ground.
+   Sign: a positive rotation about axSide takes a downward vector BACKWARD, so
+   positive pitch tips the toe down. */
+function pawPlan(i, p, duty, S, plan) {
+  if (p < duty) {
+    var u = p / duty;
+    plan.stance = true; plan.u = u;
+    if (u < GAIT.heelOffAt) {
+      plan.point = S.padMid;                       // flat: the whole pad is down
+      plan.pitch = -GAIT.touchTip * (1 - smooth(0, GAIT.touchFlat, u));
+      plan.heelOff = 0;
+    } else {
+      /* THE PIVOT MOVES TO THE TOE.  The heel comes up, the toe stays put and
+         she rolls over it — the last thing a foot does before it leaves. */
+      var v = smooth(GAIT.heelOffAt, 1.0, u);
+      plan.point = S.padFront;
+      plan.pitch = GAIT.heelLift * v;
+      plan.heelOff = v;
+    }
+  } else {
+    var s = (p - duty) / (1 - duty);
+    plan.stance = false; plan.u = s;
+    plan.point = S.padMid;
+    /* extended at toe-off, toes up through the middle for clearance, flat
+       again by the time it lands */
+    plan.pitch = lerp(GAIT.heelLift, -GAIT.touchTip, smooth(0, 1, s))
+               - GAIT.dorsi * Math.sin(Math.PI * clamp(s, 0, 1));
+    plan.heelOff = 0;
+  }
+  return plan;
+}
+var _plan = { stance: false, u: 0, point: 0, pitch: 0, heelOff: 0 };
+
+/* Two links in the leg's own sagittal plane, with the limb free to extend
+   when the two-link range runs out.  Convention: a bone rotated by theta about
+   axSide points along (-sin theta) forward, (cos theta) down. */
+function solve2(X, Y, L1, L2, elbow, out) {
+  var r = Math.hypot(X, Y);
+  var sum = L1 + L2;
+  var rMax = sum * GAIT.reachMax;
+  var rMin = Math.max(Math.abs(L1 - L2) + 0.012, sum * GAIT.reachMin);
+
+  /* The limb only telescopes once the natural range is exhausted — which is
+     at the extremes of the stroke, where a real limb is extending anyway. */
+  var e = 1;
+  if (r > rMax)      e = Math.min(r / rMax, GAIT.extMax);
+  else if (r < rMin) e = Math.max(r / rMin, GAIT.extMin);
+  out.ext = e;
+
+  var l1 = L1 * e, l2 = L2 * e;
+  var rc = clamp(r, Math.max(Math.abs(l1 - l2) + 0.012, (l1 + l2) * GAIT.reachMin),
+                    (l1 + l2) * GAIT.reachMax);
+  out.clamped = Math.abs(rc - r) > 1e-4;
+  out.miss = Math.abs(rc - r);
+
+  var alpha = Math.atan2(-X, Y);
+  var cs = clamp((l1 * l1 + rc * rc - l2 * l2) / (2 * l1 * rc), -1, 1);
+  var psi = Math.acos(cs);
+  /* phi1 / phi2 are the two segments' WORLD angles.  The caller turns them
+     into bone rotations by subtracting each segment's rest angle, because
+     with the joints on the real limb neither segment points straight down at
+     bind any more. */
+  var phi1 = alpha + elbow * psi;
+  var kx = -Math.sin(phi1) * l1, ky = Math.cos(phi1) * l1;
+  var tx = -Math.sin(alpha) * rc, ty = Math.cos(alpha) * rc;
+  out.phi1 = phi1;
+  out.phi2 = Math.atan2(-(tx - kx), (ty - ky));
+  return out;
+}
+var _ik = { phi1: 0, phi2: 0, clamped: false, ext: 1, miss: 0 };
+
+function poseLegsNew(dt) {
+  var sp = D.ground;
+  var duty = dutyOf(sp), stride = strideOf(sp), tro = trotnessOf(sp);
+  var strideTime = stride / Math.max(sp, 0.30);
+  var hx = Math.sin(D.yaw), hz = Math.cos(D.yaw);
+  var scale = M;
+
+  for (var i = 0; i < RIG.legs.length; i++) {
+    var L = RIG.legs[i], S = SEG[L.fore ? 'fore' : 'hind'];
+    var b = boneOf[L.id], st = LEG[i];
+    var p = legPhase(i, sp);
+    var wasPlanted = st.planted;
+    st.p = p;
+    var plan = pawPlan(i, p, duty, S, _plan);
+    st.planted = plan.stance;
+    st.u = plan.u;
+
+    // ── where does the foot want to be, in the world? ─────────────────────
+    if (plan.stance) {
+      if (!wasPlanted) {
+        /* TOUCHDOWN.  Anchor to the point the swing was aiming at, and only
+           to that.  Seeding it from the MEASURED pad instead is the obvious
+           thing to do — it guarantees continuity — and it is a trap: any IK
+           error is then written back into the anchor, the next stance reaches
+           for the wrong place, and the error compounds a stride at a time
+           until she is walking on stilts.  The swing path ends exactly on
+           `land` anyway, so continuity costs nothing here. */
+        st.anchor.copy(st.land);
+        st.anchor.y = GROUND.y(st.anchor.x, st.anchor.z);
+        st.anchorToe.copy(st.anchor)
+          .addScaledVector(vTmp.set(hx, 0, hz), (S.padFront - S.padMid) * scale);
+        st.anchorToe.y = GROUND.y(st.anchorToe.x, st.anchorToe.z);
+        st.driftMax = 0;
+        if (T.markersOn) dropMark(st.anchor);
+      }
+      // heel-off swaps the anchored material point from the pad centre to the toe
+      vT.copy(plan.heelOff > 0 ? st.anchorToe : st.anchor);
+      st.lift.copy(vT);
+    } else {
+      /* SWING.  From where it left to where it will land, on a smoothstep in
+         WORLD space — which is the reason it leaves the ground at zero ground
+         speed and arrives at zero ground speed instead of stabbing. */
+      var tLand = (1 - p) * strideTime;
+      var yawL = D.yaw + clamp(D.turnRate * tLand, -0.7, 0.7);
+      plantLocal(i, sp, _pl);
+      bodyToWorld(_pl.f * scale, _pl.s * scale,
+                  D.x + hx * sp * tLand, D.z + hz * sp * tLand, yawL, vTmp2);
+      /* Snap on the first frame of swing (the leg has only just left the
+         ground and the old landing point is stale), then track. */
+      if (wasPlanted || plan.u < 0.02) st.land.copy(vTmp2);
+      else st.land.lerp(vTmp2, 1 - Math.pow(0.0015, dt));
+
+      var e = smooth(0, 1, plan.u);
+      vT.lerpVectors(st.lift, st.land, e);
+      var liftH = lerp(GAIT.liftWalk, GAIT.liftTrot, tro) * (L.fore ? GAIT.liftForeBias : 1);
+      vT.y = lerp(GROUND.y(st.lift.x, st.lift.z), GROUND.y(st.land.x, st.land.z), e)
+           + liftH * Math.pow(Math.sin(Math.PI * plan.u), 0.85);
+    }
+
+    // ── the leg's own plane, read off the parent's world matrix ───────────
+    var par = b.up.parent;
+    vA.set(axSide.x, axSide.y, axSide.z).transformDirection(par.matrixWorld).normalize();
+    vDn.set(0, -1, 0).transformDirection(par.matrixWorld).normalize();
+    vF.copy(vDn).cross(vA).normalize();               // = forward, in that plane
+    vJ.setFromMatrixPosition(b.up.matrixWorld);
+
+    // the paw's pitch: flat on the ground, plus the ground's own slope
+    var pitchW = plan.pitch;
+    if (plan.stance && GROUND.swell) {
+      pitchW += -Math.atan(GROUND.slope(vT.x, vT.z, hx, hz));
+    }
+
+    /* Back the pastern out of the contact point: the contact sits at
+       (point, L3) in the paw's own frame, rotated by the paw's world pitch. */
+    var ox = plan.point * Math.cos(pitchW) - S.L3 * Math.sin(pitchW);
+    var oy = plan.point * Math.sin(pitchW) + S.L3 * Math.cos(pitchW);
+
+    vD.subVectors(vT, vJ);
+    var Xr = vD.dot(vF) / scale;
+    var Yr = vD.dot(vDn) / scale;
+    var lat = vD.dot(vA) / scale;
+
+    /* ABDUCTION.  The two bones swing in one plane, which is fine in a
+       straight line and not fine in a turn: the chest yaws while the foot is
+       nailed to the grass, and within half a stance the target is 150 mm out
+       of the plane the leg can reach in.  A dog's limb abducts, so this one
+       does too — the whole leg rolls about its own forward axis until the
+       plane contains the target.  Clamped, because a limb that swings out
+       past about 20 degrees is a limb that has been kicked. */
+    var beta = clamp(Math.atan2(lat, Math.max(Yr, 0.05)), -GAIT.abductCap, GAIT.abductCap);
+    var absorbed = Yr * Math.tan(beta);
+    st.latErr = lat - absorbed;
+
+    var X = Xr - ox;
+    var Y = Yr / Math.cos(beta) - oy;
+
+    var elbow = L.fore ? 1 : -1;         // fore folds back at the elbow, hind at the stifle
+    solve2(X, Y, S.L1, S.L2, elbow, _ik);
+    st.reachClamped = _ik.clamped;
+    st.ext = _ik.ext;
+
+    // world angles -> bone rotations, by taking off each segment's rest angle
+    var th1 = clamp(_ik.phi1 - S.a1, -GAIT.shoulderCap, GAIT.shoulderCap);
+    var th2 = clamp(_ik.phi2 - S.a2 - th1, -GAIT.kneeCap, GAIT.kneeCap);
+    _ik.th1 = th1; _ik.th2 = th2;
+
+    st.target.copy(vT);
+    st.dbg = { X: X, Y: Y, r: Math.hypot(X, Y), th1: _ik.th1, th2: _ik.th2,
+               miss: _ik.miss, lat: vD.dot(vA) / scale, pitchW: pitchW,
+               jx: vJ.x, jy: vJ.y, jz: vJ.z, tx: vT.x, ty: vT.y, tz: vT.z,
+               dnx: vDn.x, dny: vDn.y, dnz: vDn.z, fwx: vF.x, fwy: vF.y, fwz: vF.z };
+
+    /* The abduction is applied in the PARENT's frame, so it carries the whole
+       two-link plane with it; lo and paw stay pure sagittal inside it.  The
+       pad is deliberately not counter-rolled — an abducted limb does put the
+       foot down on its outside edge. */
+    qA.setFromAxisAngle(FWD, beta);
+    qB.setFromAxisAngle(axSide, _ik.th1);
+    b.up.quaternion.copy(qA).multiply(qB);
+    b.lo.quaternion.setFromAxisAngle(axSide, _ik.th2);
+    b.paw.quaternion.setFromAxisAngle(axSide, (pitchW - _ik.th1 - _ik.th2) * GAIT.pawGain);
+    /* THE LIMB'S LENGTH, and it must not be done with bone SCALE.
+
+       Scaling `up` looks like the obvious way to telescope a limb and it tore
+       a sheet of skin off the hind leg: a bone's scale multiplies every vertex
+       weighted to it about that bone's origin, while the trunk bone it blends
+       into is unscaled, so across the blend the two halves of a vertex
+       disagree by (ext-1) x its distance from the shoulder — 50 mm at the
+       ceiling — and the mesh spans the gap.  Scale also skews the skinned
+       normals, which three's skinning shader does not correct.
+
+       Moving the child bones' POSITIONS instead gives exactly the same joint
+       geometry with no scale anywhere: the mesh then stretches only through
+       the weights, which is smooth by construction. */
+    b.lo.position.copy(b.loBind).multiplyScalar(_ik.ext);
+    b.paw.position.copy(b.pawBind).multiplyScalar(_ik.ext);
+  }
+}
+
+/* Put the four feet where they belong for the phase they are already at.
+   Without this the legs that start mid-stance have never had a touchdown, so
+   they are anchored to wherever a zeroed Vector3 points — the world origin. */
+function initFeet() {
+  var sp = D.ground, duty = dutyOf(sp), stride = strideOf(sp);
+  var sweep = duty * stride / M;                  // ground covered during support
+  var fly   = (1 - duty) * stride / M;            // ... and during swing
+  for (var i = 0; i < RIG.legs.length; i++) {
+    var L = RIG.legs[i], S = SEG[L.fore ? 'fore' : 'hind'], st = LEG[i];
+    var p = legPhase(i, sp);
+    plantLocal(i, sp, _pl);
+    if (p < duty) {
+      var u = p / duty;
+      bodyToWorld((_pl.f - u * sweep) * M, _pl.s * M, D.x, D.z, D.yaw, st.anchor);
+      bodyToWorld((_pl.f - u * sweep + S.padFront - S.padMid) * M, _pl.s * M,
+                  D.x, D.z, D.yaw, st.anchorToe);
+      st.lift.copy(st.anchor);
+      st.land.copy(st.anchor);
+      st.planted = true;
+    } else {
+      var v = (p - duty) / (1 - duty);
+      bodyToWorld((_pl.f - sweep - v * fly) * M, _pl.s * M, D.x, D.z, D.yaw, st.lift);
+      bodyToWorld((_pl.f + (1 - v) * fly) * M, _pl.s * M, D.x, D.z, D.yaw, st.land);
+      st.anchor.copy(st.lift); st.anchorToe.copy(st.lift);
+      st.planted = false;
+    }
+    st.hadContact = false;
+    st.slip = st.slipAvg = st.drift = st.driftMax = 0;
+  }
+}
+
+/* ── the OLD function, verbatim out of condition.js, for the A/B ─────────── */
+function poseLegsOld(phase, speed) {
+  var swing = clamp(speed / GAIT.oldSwingAt, 0, 1);
+  var A = GAIT.oldAmpShoulder * swing;
+  var B = GAIT.oldAmpKnee * swing;
+  var trotness = smooth(1.05, 1.65, speed);
+  var duty = lerp(0.62, 0.50, trotness);
+  for (var i = 0; i < RIG.legs.length; i++) {
+    var L = RIG.legs[i], b = boneOf[L.id], st = LEG[i];
+    var off = lerp(L.phW, L.ph, trotness);
+    var p = wrap1(phase + off);
+    st.p = p; st.planted = p < duty; st.u = st.planted ? p / duty : (p - duty) / (1 - duty);
+    var th, fold;
+    if (p < duty) { th = A * (1 - 2 * (p / duty)); fold = 0; }
+    else {
+      var u = (p - duty) / (1 - duty);
+      th = -A + 2 * A * (u * u * (3 - 2 * u));
+      fold = Math.sin(u * Math.PI) * B;
+    }
+    if (!L.fore) fold = -fold * 0.75;
+    b.up.quaternion.setFromAxisAngle(axSide, th);
+    b.lo.quaternion.setFromAxisAngle(axSide, -fold);
+    b.paw.quaternion.identity();          // no paw bone existed — identity IS the old rig
+    b.lo.position.copy(b.loBind); b.paw.position.copy(b.pawBind);
+    st.ext = 1; st.reachClamped = false;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MEASUREMENT.  The pad's world position is read back off the bone matrices
+   after the pose is written, so the number in the panel is what the GPU is
+   about to draw, not what the maths intended.
+   ══════════════════════════════════════════════════════════════════════════ */
+function measureContacts(dt) {
+  var worst = 0, worstDrift = 0;
+  for (var i = 0; i < RIG.legs.length; i++) {
+    var L = RIG.legs[i], S = SEG[L.fore ? 'fore' : 'hind'], st = LEG[i], b = boneOf[L.id];
+    var pt = (st.planted && st.u >= GAIT.heelOffAt) ? S.padFront : S.padMid;
+    vTmp.set(FWD.x * pt, -S.L3, FWD.z * pt);
+    st.contact.copy(vTmp).applyMatrix4(b.paw.matrixWorld);
+    if (st.planted && st.hadContact && dt > 1e-5) {
+      var d = Math.hypot(st.contact.x - st.prevContact.x, st.contact.z - st.prevContact.z);
+      st.slip = d / dt;
+      st.slipAvg = lerp(st.slipAvg, st.slip, 1 - Math.pow(0.02, dt));
+      st.drift = Math.hypot(st.contact.x - st.anchor.x, st.contact.z - st.anchor.z);
+      if (st.u > 0.02) st.driftMax = Math.max(st.driftMax, st.drift);
+      if (st.slipAvg > worst) worst = st.slipAvg;
+      if (st.driftMax > worstDrift) worstDrift = st.driftMax;
+    } else if (!st.planted) {
+      st.slip = 0; st.slipAvg = lerp(st.slipAvg, 0, 1 - Math.pow(0.02, dt));
+    }
+    st.prevContact.copy(st.contact);
+    st.hadContact = true;
+  }
+  MEAS.worstSlip = worst;
+  MEAS.worstDrift = worstDrift;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CAMERA.  Camera 1 is condition.js's stepCamera() law, verbatim, with the
+   handler stood in as a point a fixed distance behind her, so the framing is
+   the drill's and not something invented for a screenshot.  Cameras 2 and 3
+   keep the drill's 52 degree lens and only change the distance, so nothing is
+   being cheated to make the piece look better.
+   ══════════════════════════════════════════════════════════════════════════ */
+/* out   = metres out on the perpendicular (broadside)
+   trail = metres back along her heading, as a fraction of `out`
+   aimF  = where along her body the lens is pointed, metres forward of centre
+   drill = use condition.js's own out/height law for a pair `d` apart      */
+var CAMS = [
+  { name: 'review — drill lens, broadside 3.4 m',
+    out: 3.4, h: 0.86, trail: 0.10, aimF: -0.10, aimY: 0.44, fov: 52 },
+  { name: "drill framing — condition.js law, pair at 4.5 m",
+    drill: 4.5, aimF: -2.25, aimY: 0.66, fov: 52 },
+  { name: 'pad level — lens at 0.20 m',
+    out: 2.3, h: 0.20, trail: 0.06, aimF: 0.00, aimY: 0.22, fov: 52 }
+];
+function stepCamera(dt, first) {
+  var C = CAMS[CAM.which];
+  var hx = Math.sin(D.yaw), hz = Math.cos(D.yaw);
+  var px = hz, pz = -hx;                                   // her left/right
+  var gy = GROUND.y(D.x, D.z);
+  var out, h;
+  if (C.drill) {                     // condition.js stepCamera(), verbatim law
+    out = 4.4 + C.drill * 1.02;
+    h = 2.15 + C.drill * 0.16;
+  } else { out = C.out; h = C.h; }
+
+  /* keep whichever side the camera is already on, as the drill does, so it
+     does not cut across the field every time she turns round */
+  var s1 = (CAM.pos.x - D.x) * px + (CAM.pos.z - D.z) * pz;
+  if (Math.abs(s1) > 0.35) CAM.side = s1 > 0 ? 1 : -1;
+
+  /* FEED-FORWARD.  The chase lerp is condition.js's and it is right — the lag
+     is what makes travel read as travel — but a lag of tau seconds against a
+     2.2 m/s dog is 0.5 m of framing error, which walks her out of the side of
+     the frame.  Leading the target by v*tau keeps the softness for changes of
+     direction and takes the bias out of the steady case. */
+  var tau = 0.26, lead = D.ground * tau;
+  var trail = (C.trail != null ? C.trail : 0.30) * out;
+  var wx = D.x + hx * lead + px * out * CAM.side - hx * trail;
+  var wz = D.z + hz * lead + pz * out * CAM.side - hz * trail;
+  var wy = h + gy;
+  var ax = D.x + hx * (C.aimF + lead), az = D.z + hz * (C.aimF + lead), ay = C.aimY + gy;
+
+  if (first || !CAM.ready) {
+    CAM.pos.set(wx, wy, wz); CAM.aim.set(ax, ay, az); CAM.ready = true;
+    camMain.fov = C.fov; camMain.updateProjectionMatrix();
+  }
+  var k = 1 - Math.pow(0.02, dt);
+  CAM.pos.lerp(vTmp.set(wx, wy, wz), k);
+  CAM.aim.lerp(vTmp.set(ax, ay, az), k);
+  camMain.position.copy(CAM.pos);
+  camMain.lookAt(CAM.aim);
+
+  /* The inset is one job only: can you see the pad meet the grass.  A longer
+     lens than the drill's, because this is a detail view and says so. */
+  camSide.position.set(D.x + px * 1.95 * CAM.side + hx * 0.55, 0.30 + gy,
+                       D.z + pz * 1.95 * CAM.side + hz * 0.55);
+  camSide.lookAt(D.x + hx * 0.30, 0.13 + gy, D.z + hz * 0.30);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   FRAME
+   ══════════════════════════════════════════════════════════════════════════ */
+var dogRoot = new THREE.Group(), skinned = null, ready = false;
+dogRoot.scale.setScalar(M);
+scene.add(dogRoot);
+
+function stepScene(dt) {
+  followGround(D.x, D.z);
+  var gy = GROUND.y(D.x, D.z);
+  dogRoot.position.set(D.x, -RIG.ground * M + gy, D.z);
+  dogRoot.rotation.y = D.yaw - Math.atan2(RIG.fwd[0], RIG.fwd[2]);
+
+  if (T.mode === 'new') {
+    poseTrunk(dt);
+    poseHeadBob(dt);
+    /* The trunk has to be committed before the legs, because each leg reads
+       its own joint position and its own swing plane off the parent's matrix.
+       It has to be dogRoot that is updated, not the mesh: three only rebuilds
+       a matrixWorld at render time, so the group's own matrix still holds LAST
+       frame's position here — and updating the mesh from a stale parent
+       silently solves the whole leg in model space. */
+    dogRoot.updateMatrixWorld(true);
+    poseLegsNew(dt);
+  } else {
+    boneOf.root.position.set(0, 0, 0);
+    boneOf.root.quaternion.identity();
+    boneOf.chest.quaternion.identity();
+    boneOf.head.quaternion.identity();
+    D.pitch = D.roll = D.bodyY = 0;
+    // the old bob, verbatim: one sine, on the group, with no footfall relation
+    dogRoot.position.y += Math.sin(D.gait * Math.PI * 4) * GAIT.oldBob * clamp(D.sp, 0, 2) * M;
+    skinned.updateMatrixWorld(true);
+    poseLegsOld(D.gait, D.ground);
+  }
+  dogRoot.updateMatrixWorld(true);
+  measureContacts(dt);
+
+  // blobs
+  bodyBlob.position.set(D.x, GROUND.y(D.x, D.z) + 0.008, D.z);
+  bodyBlob.material.opacity = 0.55;
+  for (var i = 0; i < 4; i++) {
+    var st = LEG[i];
+    var above = Math.max(0, st.contact.y - GROUND.y(st.contact.x, st.contact.z));
+    pawBlob[i].position.set(st.contact.x, GROUND.y(st.contact.x, st.contact.z) + 0.010, st.contact.z);
+    pawBlob[i].material.opacity = 0.85 * Math.max(0, 1 - above / 0.22);
+    pawBlob[i].scale.setScalar(1 + above * 1.6);
+  }
+  // markers fade
+  for (var m = 0; m < markers.length; m++) {
+    var mk = markers[m];
+    if (!mk.mesh.visible) continue;
+    var age = T.now - mk.born;
+    if (age > 2.6) { mk.mesh.visible = false; continue; }
+    mk.mesh.material.opacity = (T.markersOn ? 0.62 : 0) * (1 - age / 2.6);
+  }
+  markGroup.visible = T.markersOn;
+}
+
+function step(dt) {
+  T.dt = dt;
+  if (!T.paused) { T.now += dt; drive(dt); }
+  stepScene(T.paused ? 0 : dt);
+  stepCamera(T.paused ? 0 : dt, false);
+}
+
+var lastT = 0, hudT = 0;
+function frame(ms) {
+  requestAnimationFrame(frame);
+  if (!ready) return;
+  var raw = (ms - lastT) / 1000; lastT = ms;
+  if (!(raw > 0) || raw > 0.25) raw = 1 / 60;
+
+  // fps on the real clock
+  T.fpsAcc += raw; T.fpsN++;
+  if (T.fpsAcc > 0.5) { T.fps = T.fpsN / T.fpsAcc; T.fpsAcc = 0; T.fpsN = 0; }
+
+  step(raw * (T.slow ? 0.22 : 1));
+  draw();
+  if (T.now - hudT > 0.08) { hudT = T.now; paintHUD(); }
+}
+
+function draw() {
+  var W = host.clientWidth, H = host.clientHeight;
+  var big = CAM.swap ? camSide : camMain;
+  var small = CAM.swap ? camMain : camSide;
+  big.aspect = W / H;
+  big.fov = (big === camSide) ? 30 : CAMS[CAM.which].fov;
+  big.updateProjectionMatrix();
+  renderer.setScissorTest(false);
+  renderer.setViewport(0, 0, W, H);
+  renderer.setScissor(0, 0, W, H);
+  renderer.render(scene, big);
+
+  if (T.panels) {
+    var iw = Math.round(Math.min(430, W * 0.30)), ih = Math.round(iw * 0.62);
+    var ix = W - iw - 14, iy = 14;
+    small.aspect = iw / ih;
+    small.fov = (small === camSide) ? 30 : CAMS[CAM.which].fov;
+    small.updateProjectionMatrix();
+    renderer.setScissorTest(true);
+    renderer.setViewport(ix, iy, iw, ih);
+    renderer.setScissor(ix, iy, iw, ih);
+    renderer.render(scene, small);
+    renderer.setScissorTest(false);
+    var fr = document.getElementById('insetFrame');
+    fr.style.display = 'block';
+    fr.style.left = ix + 'px'; fr.style.bottom = iy + 'px';
+    fr.style.width = iw + 'px'; fr.style.height = ih + 'px';
+    var lb = document.getElementById('insetLabel');
+    lb.style.display = 'block';
+    lb.style.left = (ix + 6) + 'px'; lb.style.bottom = (iy + ih - 18) + 'px';
+    lb.textContent = CAM.swap ? CAMS[CAM.which].name : 'pad / ground contact';
+  } else {
+    document.getElementById('insetFrame').style.display = 'none';
+    document.getElementById('insetLabel').style.display = 'none';
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE PANEL
+   ══════════════════════════════════════════════════════════════════════════ */
+var tEl = document.getElementById('t'), legEl = document.getElementById('legs');
+function row(k, v, cls) {
+  return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td class="k">' + k +
+         '</td><td class="v">' + v + '</td></tr>';
+}
+function bar(frac, col) {
+  return '<span class="bar"><i style="width:' + Math.round(clamp(frac, 0, 1) * 100) +
+         '%;background:' + col + '"></i></span>';
+}
+function paintHUD() {
+  if (!T.panels) { return; }
+  var sp = D.ground, tro = trotnessOf(sp), duty = dutyOf(sp);
+  var slipPct = sp > 0.15 ? (MEAS.worstSlip / sp) * 100 : 0;
+  var slipCls = slipPct < 6 ? 'good' : (slipPct < 20 ? 'warn' : 'bad');
+
+  var h = '';
+  h += row('gait phase', '<b class="num">' + D.gait.toFixed(3) + '</b>' +
+       bar(D.gait, '#C8D6E2'));
+  h += row('metres / stride &nbsp;<i>measured</i>',
+       '<b class="num">' + (MEAS.strideMeas ? MEAS.strideMeas.toFixed(3) : '—') + '</b> m');
+  h += row('metres / stride &nbsp;<i>model</i>', strideOf(sp).toFixed(3) + ' m');
+  h += row('stride rate', (sp > 0.05 ? (sp / strideOf(sp)).toFixed(2) : '0.00') + ' /s');
+  h += '<tr class="gap"><td colspan="2"></td></tr>';
+  h += row('speed', fx(sp, 2) + ' m/s');
+  h += row('acceleration', '<span class="' + (D.accel < -0.6 ? 'bad' : (D.accel > 0.6 ? 'good' : '')) +
+       '">' + fx(D.accel, 2) + '</span> m/s²');
+  h += row('duty factor', duty.toFixed(3));
+  h += row('trotness', tro.toFixed(2) + bar(tro, '#8FD07A'));
+  h += '<tr class="gap"><td colspan="2"></td></tr>';
+  h += row('withers drop', (D.wither * 1000).toFixed(0) + ' mm', 'rule');
+  h += row('croup drop', (D.croup * 1000).toFixed(0) + ' mm');
+  h += row('trunk pitch', fx(D.pitch * 180 / Math.PI, 1) + '°');
+  h += row('trunk roll', fx(D.roll * 180 / Math.PI, 1) + '°');
+  h += row('head lag', fx(D.headLag * M * 1000, 0) + ' mm');
+  h += '<tr class="gap"><td colspan="2"></td></tr>';
+  h += row('planted paw slip', '<span class="' + slipCls + '">' +
+       (MEAS.worstSlip * 1000).toFixed(0) + ' mm/s</span>', 'rule');
+  h += row('… as % of body speed', '<span class="' + slipCls + '">' +
+       slipPct.toFixed(1) + ' %</span>');
+  if (T.mode === 'new') {
+    h += row('worst drift in stance', (MEAS.worstDrift * 1000).toFixed(0) + ' mm');
+    var ex = 1;
+    for (var q = 0; q < 4; q++) ex = Math.max(ex, LEG[q].ext || 1);
+    h += row('limb extension, peak', '×' + ex.toFixed(3));
+  }
+  tEl.innerHTML = h;
+
+  var g = '<tr><td class="k">leg</td><td class="v">phase &nbsp; state &nbsp; slip</td></tr>';
+  for (var i = 0; i < 4; i++) {
+    var st = LEG[i];
+    g += '<tr><td class="k">' + RIG.legs[i].id.toUpperCase() +
+      (RIG.legs[i].fore ? ' fore' : ' hind') + '</td><td class="v">' +
+      st.p.toFixed(2) + ' &nbsp; <span class="st-' + (st.planted ? 'P' : 'S') + '">' +
+      (st.planted ? 'DOWN' : 'air&nbsp;') + '</span> &nbsp; ' +
+      (st.planted ? (st.slipAvg * 1000).toFixed(0) + '' : '–') +
+      (st.reachClamped ? ' <span class="warn">R</span>' : '') +
+      '</td></tr>';
+  }
+  legEl.innerHTML = g;
+
+  document.getElementById('fps').textContent = T.fps.toFixed(0) + ' fps' + (T.slow ? '  ·  slow-mo' : '');
+  document.getElementById('modeName').textContent =
+    (T.mode === 'new' ? 'NEW gait' : 'OLD gait (condition.js)') + (T.paused ? '  ·  PAUSED' : '');
+  document.getElementById('camName').textContent =
+    CAMS[CAM.which].name + (GROUND.swell ? '  ·  swell' : '') +
+    (T.steady ? '  ·  steady' : '  ·  ' + SCRIPT[RUN.leg].note);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   INPUT / RESIZE / BOOT
+   ══════════════════════════════════════════════════════════════════════════ */
+function resize() {
+  var W = host.clientWidth, H = host.clientHeight;
+  /* setSize(W, H, false) leaves the canvas CSS size unset, so the element is
+     laid out at its buffer size — devicePixelRatio times too big — and the
+     picture spills off the bottom right while the scissored inset lands
+     somewhere else entirely.  Let three set the style. */
+  renderer.setSize(W, H);
+  camMain.aspect = W / H; camMain.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+window.addEventListener('keydown', function (e) {
+  var k = e.key.toLowerCase();
+  KEYS[k] = true;
+  if (k === ' ') { T.paused = !T.paused; e.preventDefault(); }
+  else if (k === 'o') { T.mode = (T.mode === 'new') ? 'old' : 'new'; initFeet(); }
+  else if (k === 'r') T.steady = !T.steady;
+  else if (k === 't') T.slow = !T.slow;
+  else if (k === 'g') { GROUND.swell = !GROUND.swell; reshapeGround(); }
+  else if (k === 'm') T.markersOn = !T.markersOn;
+  else if (k === 'f') CAM.swap = !CAM.swap;
+  else if (k === 'h') { T.panels = !T.panels;
+    document.querySelectorAll('.panel').forEach(function (n) { n.style.display = T.panels ? 'block' : 'none'; }); }
+  else if (k === '1' || k === '2' || k === '3') { CAM.which = (+k) - 1; CAM.ready = false; }
+  else if (k === '[') RUN.target = Math.max(0, RUN.target - 0.3);
+  else if (k === ']') RUN.target += 0.3;
+}, false);
+window.addEventListener('keyup', function (e) { KEYS[e.key.toLowerCase()] = false; }, false);
+window.addEventListener('blur', function () { KEYS = {}; }, false);
+
+/* A screenshot hook for the harness: renders synchronously and posts the PNG
+   to _work/shot-<name>.png, because the pane runs hidden and rAF stops. */
+window.__shot = function (name) {
+  draw();
+  return fetch('/shot/' + name, { method: 'POST', body: renderer.domElement.toDataURL('image/png') })
+    .then(function (r) { return r.text(); });
+};
+/* Deterministic stepping.  requestAnimationFrame is paused whenever the pane
+   is hidden, so the harness drives the sim from here instead of hoping. */
+window.__tick = function (n, dt) {
+  dt = dt || 1 / 60;
+  for (var i = 0; i < (n || 1); i++) step(dt);
+  paintHUD();
+  draw();                    // rAF is paused when the pane is hidden; render here
+  return T.now;
+};
+/* Real render cost, measured rather than assumed — the fps counter reads 0
+   whenever the page is not actually being composited. */
+window.__perf = function (n) {
+  n = n || 240;
+  step(1 / 60); draw();                      // warm
+  var t0 = performance.now();
+  for (var i = 0; i < n; i++) { step(1 / 60); draw(); }
+  var ms = (performance.now() - t0) / n;
+  return { msPerFrame: +ms.toFixed(3), impliedFps: +(1000 / ms).toFixed(1), frames: n };
+};
+window.__set = function (o) {
+  if (o.mode) { T.mode = o.mode; initFeet(); }
+  if (o.cam != null) { CAM.which = o.cam; CAM.ready = false; }
+  if (o.steady != null) T.steady = o.steady;
+  if (o.straight != null) T.straight = o.straight;
+  if (o.yaw != null) { D.yaw = o.yaw; RUN.wantYaw = o.yaw; initFeet(); }
+  if (o.pos) { D.x = o.pos[0]; D.z = o.pos[1]; initFeet(); }
+  if (o.swell != null) { GROUND.swell = o.swell; reshapeGround(); }
+  if (o.speed != null) { RUN.target = o.speed; T.steady = false; }
+  if (o.hold !== undefined) { T.hold = o.hold; if (o.hold != null) T.steady = false; }
+  if (o.paused != null) T.paused = o.paused;
+  if (o.markers != null) T.markersOn = o.markers;
+  if (o.panels != null) { T.panels = o.panels;
+    document.querySelectorAll('.panel').forEach(function (n2) { n2.style.display = T.panels ? 'block' : 'none'; }); }
+  if (o.swap != null) CAM.swap = o.swap;
+  return true;
+};
+/* Per-leg diagnostics: what was asked of the IK, and what the bone matrices
+   actually produced.  The gap between the two is the only honest error term. */
+window.__diag = function () {
+  return LEG.map(function (l, i) {
+    var t = l.target, c = l.contact, a = (l.planted && l.u >= GAIT.heelOffAt) ? l.anchorToe : l.anchor;
+    return {
+      leg: RIG.legs[i].id, p: +l.p.toFixed(3), u: +l.u.toFixed(3), down: l.planted,
+      ikErr_mm: +(Math.hypot(c.x - t.x, c.y - t.y, c.z - t.z) * 1000).toFixed(1),
+      anchorErr_mm: +(Math.hypot(t.x - a.x, t.z - a.z) * 1000).toFixed(1),
+      totalErr_mm: +(Math.hypot(c.x - a.x, c.z - a.z) * 1000).toFixed(1),
+      contactY_mm: +(c.y * 1000).toFixed(1),
+      ext: +(l.ext || 1).toFixed(3),
+      dbg: l.dbg ? { X: +l.dbg.X.toFixed(4), Y: +l.dbg.Y.toFixed(4), r: +l.dbg.r.toFixed(4),
+        lat: +l.dbg.lat.toFixed(4), th1: +l.dbg.th1.toFixed(3), th2: +l.dbg.th2.toFixed(3),
+        miss: +l.dbg.miss.toFixed(4), pitchW: +l.dbg.pitchW.toFixed(3),
+        joint: [+l.dbg.jx.toFixed(3), +l.dbg.jy.toFixed(3), +l.dbg.jz.toFixed(3)],
+        targ:  [+l.dbg.tx.toFixed(3), +l.dbg.ty.toFixed(3), +l.dbg.tz.toFixed(3)],
+        down:  [+l.dbg.dnx.toFixed(3), +l.dbg.dny.toFixed(3), +l.dbg.dnz.toFixed(3)],
+        fwd:   [+l.dbg.fwx.toFixed(3), +l.dbg.fwy.toFixed(3), +l.dbg.fwz.toFixed(3)] } : null
+    };
+  });
+};
+/* Live constants, so every number in GAIT can be tuned without a reload and
+   the ones that end up in condition.js are the ones that were actually seen. */
+window.__gait = GAIT;
+window.__seg = SEG;
+window.__cam = function () {
+  return { pos: camMain.position.toArray().map(function (v) { return +v.toFixed(3); }),
+           aim: CAM.aim.toArray().map(function (v) { return +v.toFixed(3); }),
+           fov: camMain.fov, side: CAM.side, which: CAM.which,
+           dog: [+D.x.toFixed(3), +D.z.toFixed(3)], yaw: +D.yaw.toFixed(3),
+           dist: +Math.hypot(camMain.position.x - D.x, camMain.position.z - D.z).toFixed(3) };
+};
+window.__state = function () {
+  return { x: D.x, z: D.z, yaw: D.yaw,
+           gait: D.gait, sp: D.ground, accel: D.accel, pitch: D.pitch, roll: D.roll,
+           bodyY: D.bodyY, strideMeas: MEAS.strideMeas, worstSlip: MEAS.worstSlip,
+           worstDrift: MEAS.worstDrift, fps: T.fps, mode: T.mode,
+           legs: LEG.map(function (l) { return { p: +l.p.toFixed(3), down: l.planted,
+             slip: +(l.slipAvg * 1000).toFixed(1), drift: +(l.driftMax * 1000).toFixed(1),
+             ext: +(l.ext || 1).toFixed(3), clamped: l.reachClamped }; }) };
+};
+
+resize();
+fetch('../../dog.glb')
+  .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status + ' on ../../dog.glb'); return r.arrayBuffer(); })
+  .then(function (buf) {
+    return new Promise(function (res, rej) { new THREE.GLTFLoader().parse(buf, '', res, rej); });
+  })
+  .then(function (gltf) {
+    var baked = bakeGeometry(gltf);
+    buildWeights(baked.geom);
+    skinned = buildSkeleton(baked.geom, baked.mat);
+    dogRoot.add(skinned);
+    // settle the springs and put the four feet down before the first frame
+    D.headY = 0; D.headV = 0;
+    skinned.updateMatrixWorld(true);
+    initFeet();
+    stepScene(1 / 60);
+    stepCamera(1 / 60, true);
+    ready = true;
+    console.log('rig: ' + bones.length + ' bones, ' +
+      baked.geom.attributes.position.count + ' vertices');
+  })
+  ['catch'](function (e) {
+    die('Could not build the dog. This page needs the local server — open it at ' +
+        '<code>http://localhost:5312/_work/gauntlet/dog.html</code>, not from the file system.', e);
+  });
+
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

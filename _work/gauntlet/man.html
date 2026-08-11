@@ -1,0 +1,789 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>THE TRAINER — rigged, walking</title>
+<style>
+  html, body { margin:0; height:100%; background:#0d0f12; color:#e8e6e1;
+    font:13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; overflow:hidden; }
+  #cv { display:block; width:100vw; height:100vh; }
+  .lab { position:fixed; bottom:50px; letter-spacing:.14em; text-transform:uppercase;
+    font-size:9px; color:#fff; opacity:.75; text-shadow:0 1px 6px #000; pointer-events:none; }
+  #labA { left:calc(25vw - 34px); }
+  #labB { left:calc(75vw - 50px); }
+  #split { position:fixed; top:0; bottom:40px; left:50%; width:1px; background:rgba(255,255,255,.16); pointer-events:none; }
+  /* one slim bar, so nothing ever sits on top of him */
+  #hud { position:fixed; left:0; right:0; bottom:0; height:40px; box-sizing:border-box;
+    background:#0d0f12; border-top:1px solid rgba(255,255,255,.12);
+    display:flex; align-items:center; gap:9px; padding:0 10px; }
+  #hud h1 { margin:0; font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:#b9d8ff;
+    font-weight:600; white-space:nowrap; }
+  .row { display:flex; align-items:center; gap:5px; }
+  .row label { color:#8d959e; font-size:10px; white-space:nowrap; }
+  input[type=range] { width:46px; height:3px; accent-color:#6fa8ff; }
+  .val { min-width:28px; text-align:right; font-variant-numeric:tabular-nums; color:#dfe6ee; font-size:10px; }
+  .btns { display:flex; gap:4px; }
+  button { background:#1b2028; color:#dfe6ee; border:1px solid rgba(255,255,255,.14); border-radius:5px;
+    padding:4px 7px; font-size:10px; cursor:pointer; white-space:nowrap; }
+  button:hover { background:#242b35; }
+  button.on { background:#2c4a7c; border-color:#4d7fd0; color:#fff; }
+  #stat { margin-left:auto; display:flex; align-items:center; gap:9px;
+    font-variant-numeric:tabular-nums; font-size:9px; color:#9aa3ad; white-space:nowrap; }
+  #stat b { color:#b9d8ff; font-weight:600; }
+  .ok { color:#6ee7a0; } .bad { color:#ff7b7b; }
+  #err { position:fixed; inset:auto 14px 14px 14px; background:#3a1010; border:1px solid #a33; padding:10px;
+    border-radius:8px; display:none; white-space:pre-wrap; font-family:ui-monospace,Menlo,monospace; font-size:11px; }
+</style>
+
+<canvas id="cv"></canvas>
+<div id="split"></div>
+<div class="lab" id="labA">side · 4 m</div>
+<div class="lab" id="labB">three-quarter · 4 m</div>
+<div id="striplab" style="display:none"></div>
+
+<div id="hud">
+  <div class="row"><label>m/s</label><input id="sp" type="range" min="0.55" max="1.75" step="0.01" value="1.04"><span class="val" id="spv">1.04</span></div>
+  <div class="row"><label>cyc</label><input id="cd" type="range" min="0.85" max="1.45" step="0.01" value="1.15"><span class="val" id="cdv">1.15</span></div>
+  <div class="row"><label>arm</label><input id="as" type="range" min="0" max="40" step="1" value="23"><span class="val" id="asv">23</span></div>
+  <div class="btns">
+    <button id="bPlay" class="on">❚❚</button>
+    <button id="bBone">skel</button>
+    <button id="bBind">bind</button>
+    <button id="bTrail">trace</button>
+    <button id="bSlow">½×</button>
+    <button id="bStrip">strip</button>
+  </div>
+  <div id="stat"></div>
+</div>
+<div id="err"></div>
+
+<script src="../../vendor/three.min.js"></script>
+<script src="../../vendor/GLTFLoader.js"></script>
+<script>
+"use strict";
+window.onerror = function (m, s, l) {
+  var e = document.getElementById('err'); e.style.display = 'block';
+  e.textContent = m + '\n' + s + ':' + l;
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE TRAINER
+   The scan arrived unrigged (skins:0) with both trouser legs welded into one
+   column. man-rigged.glb is the same 33k-vertex photogrammetry, re-rigged:
+   a 26-bone skeleton fitted to the scan's own measurements, the crotch cut
+   open along the plane between the legs, and weights solved by heat
+   diffusion over the welded mesh graph.
+
+   The walk here is not a borrowed clip. Every rigged humanoid three.js r128
+   ships that is actually redistributable is either a cartoon robot (CC0) or
+   a 3k-vertex mannequin (CC-BY); Soldier.glb and Xbot.glb are Mixamo. So the
+   cycle is built from normative human gait kinematics and, more importantly,
+   is driven from the FOOT rather than from joint angles: the stance foot is
+   pinned to a world-fixed contact point and rolls heel→flat→toe over it,
+   and the knee comes out of two-bone IK. A planted foot cannot skate, and
+   foot skate is the single thing that makes a walk read as fake.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+var BAR = 40;          // height of the control bar, reserved out of every viewport
+var API = [];
+function need(path) {
+  var parts = path.split('.'), o = THREE, ok = true;
+  for (var i = 0; i < parts.length; i++) { if (o == null || o[parts[i]] === undefined) { ok = false; break; } o = o[parts[i]]; }
+  API.push({ n: path, ok: ok });
+  return ok;
+}
+['AnimationMixer', 'AnimationClip', 'QuaternionKeyframeTrack', 'VectorKeyframeTrack', 'SkinnedMesh',
+ 'Skeleton', 'SkeletonHelper', 'Bone', 'Quaternion', 'ACESFilmicToneMapping',
+ 'sRGBEncoding', 'PCFSoftShadowMap', 'LoopRepeat', 'MeshStandardMaterial', 'CanvasTexture',
+ 'Quaternion.prototype.setFromUnitVectors', 'Quaternion.prototype.invert',
+ 'Object3D.prototype.worldToLocal', 'AnimationMixer.prototype.clipAction',
+ 'AnimationClip.prototype.resetDuration'].forEach(need);
+var REV = THREE.REVISION;
+
+/* ───────────────────────────── scene ───────────────────────────── */
+var cv = document.getElementById('cv');
+var renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.02;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+/* instance methods, not prototype ones — the minified r128 build assigns
+   several renderer methods inside the constructor */
+['setScissorTest', 'setViewport', 'setScissor'].forEach(function (m) {
+  API.push({ n: 'renderer.' + m, ok: typeof renderer[m] === 'function' });
+});
+
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8fb4d8);
+scene.fog = new THREE.Fog(0x9dbcdc, 22, 78);
+
+var sun = new THREE.DirectionalLight(0xfff2df, 2.05);
+sun.position.set(-4.2, 6.6, 3.1);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 26;
+sun.shadow.camera.left = -4.5; sun.shadow.camera.right = 4.5;
+sun.shadow.camera.top = 4.5; sun.shadow.camera.bottom = -3.0;
+sun.shadow.bias = -0.0009; sun.shadow.normalBias = 0.022;
+scene.add(sun); scene.add(sun.target);
+scene.add(new THREE.HemisphereLight(0xbcd6f2, 0x54502f, 0.95));
+var fill = new THREE.DirectionalLight(0xcfe0f5, 0.4); fill.position.set(5, 2.4, -4); scene.add(fill);
+
+/* ground — deliberately plain, another builder owns the grass. It only has
+   to be textured enough that a skating foot would be obvious. */
+function groundTex() {
+  var c = document.createElement('canvas'); c.width = c.height = 512;
+  var x = c.getContext('2d');
+  x.fillStyle = '#5c6b3c'; x.fillRect(0, 0, 512, 512);
+  var i, n;
+  for (n = 0; n < 5200; n++) {
+    i = Math.random();
+    x.fillStyle = 'rgba(' + (68 + i * 60 | 0) + ',' + (78 + i * 62 | 0) + ',' + (36 + i * 44 | 0) + ',' + (0.16 + i * 0.5) + ')';
+    var w = 2 + Math.random() * 9;
+    x.fillRect(Math.random() * 512, Math.random() * 512, w, 1 + Math.random() * 3);
+  }
+  for (n = 0; n < 260; n++) {
+    x.fillStyle = 'rgba(40,46,24,' + (0.05 + Math.random() * 0.13) + ')';
+    x.beginPath(); x.arc(Math.random() * 512, Math.random() * 512, 6 + Math.random() * 26, 0, 6.29); x.fill();
+  }
+  var t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(26, 26);
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy(); t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+var ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 90),
+  new THREE.MeshStandardMaterial({ map: groundTex(), roughness: 0.97, metalness: 0 }));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+
+/* ───────────────────────── gait definition ─────────────────────────
+   One stride = two steps. t is the phase of HIS RIGHT leg: t=0 is right
+   heel strike, right toe-off at 0.60, so double support is 0.60→0.50 of
+   the other leg — the 60/40 stance/swing split of a real walk.          */
+
+var DEG = Math.PI / 180;
+function curve(keys) {               // periodic Catmull-Rom through [t, v] keys
+  return function (t) {
+    t = t - Math.floor(t);
+    var n = keys.length, i = 0;
+    while (i < n && keys[i][0] <= t) i++;
+    var k1 = keys[(i - 1 + n) % n], k2 = keys[i % n];
+    var k0 = keys[(i - 2 + n) % n], k3 = keys[(i + 1) % n];
+    var t1 = k1[0], t2 = k2[0]; if (t2 <= t1) t2 += 1;
+    var u = (t - t1) / (t2 - t1); if (u < 0) u += 1 / (t2 - t1) * 0;
+    u = Math.max(0, Math.min(1, u));
+    var v0 = k0[1], v1 = k1[1], v2 = k2[1], v3 = k3[1];
+    var a = 2 * v1, b = v2 - v0, c = 2 * v0 - 5 * v1 + 4 * v2 - v3, d = -v0 + 3 * v1 - 3 * v2 + v3;
+    return 0.5 * (a + b * u + c * u * u + d * u * u * u);
+  };
+}
+
+/* foot pitch, degrees, + is toe-down (plantarflexion) */
+var footPitch = curve([
+  [0.00, -5], [0.04, -2], [0.08, 0], [0.30, 0], [0.42, 1], [0.50, 10], [0.60, 25],
+  [0.66, 14], [0.72, 2], [0.80, -4], [0.90, -6], [0.97, -5]
+]);
+/* shoulder flexion of the SAME-side arm, + is forward. Counter-phase to the leg. */
+var armCurve = curve([[0.00, -1.00], [0.25, -0.32], [0.50, 1.00], [0.75, 0.30]]);
+var elbowCurve = curve([[0.00, 0.22], [0.22, 0.30], [0.50, 1.00], [0.72, 0.62]]);
+
+var GAIT = {
+  stride: 1.196,     // metres travelled per full cycle
+  cycle: 1.15,       // seconds
+  toeOff: 0.60,
+  ahead: 0.27,       // share of the stride the foot lands ahead of the hip
+  pelvisDrop: 0.030, // how far below standing height the pelvis rides
+  pelvisBob: 0.028,  // ± vertical, twice per cycle, high at mid-stance
+  pelvisSway: 0.022, // ± lateral, once per cycle, toward the stance leg
+  pelvisYaw: 4.2 * DEG,
+  pelvisObl: 3.6 * DEG,
+  trunkYaw: 3.4 * DEG,
+  lean: 3.6 * DEG,
+  armOut: 10.5 * DEG,
+  armSwing: 23 * DEG,
+  elbow: 30 * DEG,
+  lift: 0.050        // ankle lift in swing
+};
+
+/* ───────────────────────── load and rig ───────────────────────── */
+var BONE = {}, model = null, skel = null, mixer = null, action = null, helper = null;
+var M = {};   // measurements taken from the rig at load
+
+new THREE.GLTFLoader().load('man-rigged.glb', function (g) {
+  model = g.scene;
+  model.traverse(function (o) {
+    if (o.isBone) BONE[o.name] = o;
+    if (o.isMesh || o.isSkinnedMesh) {
+      o.castShadow = true; o.receiveShadow = true;
+      o.frustumCulled = false;
+      var m = o.material;
+      if (m.map) { m.map.encoding = THREE.sRGBEncoding; m.map.anisotropy = renderer.capabilities.getMaxAnisotropy(); }
+      m.roughness = 0.92; m.metalness = 0;
+      /* the scan's texture already carries the light it was captured in, so
+         it gets a gentler sun than a clean albedo would want */
+      m.envMapIntensity = 0.55;
+      skel = o.skeleton || skel;
+      M.verts = o.geometry.attributes.position.count;
+    }
+  });
+  build();
+}, undefined, function (e) {
+  document.getElementById('err').style.display = 'block';
+  document.getElementById('err').textContent = 'man-rigged.glb failed to load: ' + e;
+});
+
+var V = function (x, y, z) { return new THREE.Vector3(x, y, z); };
+var _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _v = new THREE.Vector3();
+var AXIS_X = V(1, 0, 0), AXIS_Y = V(0, 1, 0), AXIS_Z = V(0, 0, 1);
+
+function build() {
+  /* the GLB is in scan units — 1.8985 tall including the cap. Scale him to
+     the 1.75 m the app uses, and stand him on y = 0. */
+  var box = new THREE.Box3().setFromObject(model);
+  M.rawH = box.max.y - box.min.y;
+  M.scale = 1.75 / M.rawH;
+  M.rawGround = box.min.y;
+
+  var rig = new THREE.Group();
+  rig.add(model);
+  model.scale.setScalar(M.scale);
+  model.position.y = -M.rawGround * M.scale;
+  scene.add(rig);
+  M.rig = rig;
+
+  /* Everything below is in the MODEL's own units, because that is the frame
+     the bone tracks are written in. Metres get divided by M.scale on the way
+     in. Mixing the two is what had him hovering a foot off the grass. */
+  model.updateMatrixWorld(true);
+  var bind = {};
+  ['Hips', 'Spine', 'Chest', 'Neck', 'Head', 'UpperArmL', 'ForeArmL', 'HandL', 'HandEndL',
+   'UpperArmR', 'ForeArmR', 'HandR', 'HandEndR', 'UpperLegL', 'LowerLegL', 'FootL', 'ToeL', 'ToeEndL',
+   'UpperLegR', 'LowerLegR', 'FootR', 'ToeR', 'ToeEndR', 'ClavL', 'ClavR'].forEach(function (n) {
+    bind[n] = model.worldToLocal(BONE[n].getWorldPosition(new THREE.Vector3()));
+  });
+  M.bind = bind;
+  M.GY = M.rawGround;                              // the ground, in model units
+
+  ['L', 'R'].forEach(function (s) {
+    M['L1' + s] = bind['UpperLeg' + s].distanceTo(bind['LowerLeg' + s]);
+    M['L2' + s] = bind['LowerLeg' + s].distanceTo(bind['Foot' + s]);
+    M['ankleY' + s] = bind['Foot' + s].y - M.GY;
+    M['footX' + s] = bind['Foot' + s].x;
+    M['hipOff' + s] = bind['UpperLeg' + s].clone().sub(bind.Hips);
+    /* heel and toe, relative to the ankle, so the foot can roll over a
+       world-fixed contact point instead of sliding on one */
+    M['toe' + s] = bind['ToeEnd' + s].clone().sub(bind['Foot' + s]);
+    M['heel' + s] = V(0, -M['ankleY' + s], M['toe' + s].z * -0.58);
+    M['toe' + s].y = -M['ankleY' + s];
+  });
+  M.hipY = bind.Hips.y;
+
+  /* unit bind directions for every bone that gets aimed */
+  M.dir = {};
+  [['UpperLegL', 'LowerLegL'], ['LowerLegL', 'FootL'], ['FootL', 'ToeL'],
+   ['UpperLegR', 'LowerLegR'], ['LowerLegR', 'FootR'], ['FootR', 'ToeR'],
+   ['UpperArmL', 'ForeArmL'], ['ForeArmL', 'HandL'], ['HandL', 'HandEndL'],
+   ['UpperArmR', 'ForeArmR'], ['ForeArmR', 'HandR'], ['HandR', 'HandEndR']].forEach(function (p) {
+    M.dir[p[0]] = bind[p[1]].clone().sub(bind[p[0]]).normalize();
+  });
+
+  M.speed = GAIT.stride / GAIT.cycle;
+  bakeClip();
+  mixer = new THREE.AnimationMixer(model);
+  action = mixer.clipAction(M.clip);
+  action.setLoop(THREE.LoopRepeat, Infinity);
+  action.play();
+
+  helper = new THREE.SkeletonHelper(model);
+  helper.visible = false;
+  helper.material.linewidth = 2;
+  scene.add(helper);
+
+  makeTrail();
+  ready = true;
+  measureSkate();
+  setTimeout(runBench, 260);
+}
+
+/* ───────── where the ankle must be at phase t, in the walking frame ─────────
+   z here is measured against the pelvis, which sits at z=0; the world advance
+   is added on top, so a contact point that moves backward at exactly the
+   walking speed is standing still on the ground.                              */
+function ankleTarget(t, s) {
+  var S = GAIT.stride / M.scale;              // stride, in model units
+  var TO = GAIT.toeOff;
+  var heel = M['heel' + s], toe = M['toe' + s];
+  var gY = M.GY;                               // ground, in the model frame
+
+  function stance(tt) {                        // tt in [0, TO]
+    var p = footPitch(tt) * DEG;               // + = toe down
+    var cp = Math.cos(p), sp = Math.sin(p);
+    /* nominal ankle line: a world-fixed point drifting backward at v.
+       Less of the step is spent in front of the hip than behind it, because
+       at toe-off the heel is up and the leg is effectively longer. */
+    var zLine = GAIT.ahead * S - S * tt;
+    /* pivot on the heel until the foot is flat, on the toe once it lifts */
+    var piv = (tt < 0.22) ? heel : toe;
+    var pz = zLine + piv.z, py = gY;
+    /* ankle = pivot + R_x(pitch) applied to (ankle - pivot) */
+    var ox = 0, oy = -piv.y, oz = -piv.z;
+    return V(0, py + (oy * cp - oz * sp), pz + (oy * sp + oz * cp));
+  }
+
+  if (t <= TO) return stance(t);
+
+  /* Swing: toe-off to the next heel strike. In this frame the cycle is
+     periodic — the next strike sits at the same local z as the last one,
+     because the pelvis has moved exactly one stride to meet it. */
+  var a = stance(TO), b = stance(0.0001);
+  var u = (t - TO) / (1 - TO);
+  var e = u * u * (3 - 2 * u);                                  // smoothstep
+  var z = a.z + (b.z - a.z) * e;
+  var y = a.y + (b.y - a.y) * e;
+  /* the heel comes up hard just after toe-off, so the lift peaks early */
+  var lift = (GAIT.lift / M.scale) * Math.sin(Math.PI * Math.pow(u, 0.66));
+  return V(0, y + lift, z);
+}
+
+/* two-bone IK. The pole points forward, which is what stops a knee bending
+   backward the moment the target gets close to the hip. */
+function solveIK(hip, target, L1, L2, pole, out) {
+  var d = _v.copy(target).sub(hip);
+  var dist = d.length();
+  var maxd = (L1 + L2) * 0.9995, mind = Math.abs(L1 - L2) + 1e-4;
+  if (dist > maxd) { d.multiplyScalar(maxd / dist); dist = maxd; }
+  if (dist < mind) { d.multiplyScalar(mind / Math.max(dist, 1e-6)); dist = mind; }
+  var dh = d.clone().normalize();
+  var a = (dist * dist + L1 * L1 - L2 * L2) / (2 * dist);
+  var h = Math.sqrt(Math.max(0, L1 * L1 - a * a));
+  var n = pole.clone().addScaledVector(dh, -pole.dot(dh));
+  if (n.lengthSq() < 1e-9) n.set(0, 0, 1).addScaledVector(dh, -dh.z);
+  n.normalize();
+  var knee = hip.clone().addScaledVector(dh, a).addScaledVector(n, h);
+  out.thigh = knee.clone().sub(hip).normalize();
+  out.shin = hip.clone().addScaledVector(d, 1).sub(knee).normalize();
+  out.knee = knee;
+  return out;
+}
+
+/* ───────────────────────── bake the clip ─────────────────────────
+   Everything above is evaluated on a fixed sample grid and written into
+   QuaternionKeyframeTracks, so at run time it is the AnimationMixer doing
+   the work — no per-frame IK, no per-frame trigonometry.               */
+var TRACKED = ['Hips', 'Spine', 'Chest', 'Neck', 'Head',
+  'ClavL', 'UpperArmL', 'ForeArmL', 'HandL', 'ClavR', 'UpperArmR', 'ForeArmR', 'HandR',
+  'UpperLegL', 'LowerLegL', 'FootL', 'ToeL', 'UpperLegR', 'LowerLegR', 'FootR', 'ToeR'];
+
+function bakeClip() {
+  var N = 60, i, k;
+  var times = new Float32Array(N + 1);
+  var q = {}, hipsPos = new Float32Array((N + 1) * 3);
+  TRACKED.forEach(function (n) { q[n] = new Float32Array((N + 1) * 4); });
+  M.trace = { L: [], R: [] };
+
+  for (i = 0; i <= N; i++) {
+    var t = i / N;
+    times[i] = t * GAIT.cycle;
+    /* the last key IS the first key — sampling t=1 separately lands on the
+       wrong side of every phase test and puts a hitch in the loop */
+    var pose = poseAt(i === N ? 0 : t);
+    hipsPos[i * 3] = pose.hips.p.x; hipsPos[i * 3 + 1] = pose.hips.p.y; hipsPos[i * 3 + 2] = pose.hips.p.z;
+    for (k = 0; k < TRACKED.length; k++) {
+      var n = TRACKED[k], v = pose.q[n] || _q.identity();
+      var o = i * 4;
+      /* keep every quaternion on the same hemisphere as the last, or the
+         mixer's slerp takes the long way round and the limb spins */
+      if (i > 0) {
+        var pv = q[n], dot = v.x * pv[o - 4] + v.y * pv[o - 3] + v.z * pv[o - 2] + v.w * pv[o - 1];
+        if (dot < 0) { v = v.clone(); v.x *= -1; v.y *= -1; v.z *= -1; v.w *= -1; }
+      }
+      q[n][o] = v.x; q[n][o + 1] = v.y; q[n][o + 2] = v.z; q[n][o + 3] = v.w;
+    }
+  }
+
+  var tracks = [new THREE.VectorKeyframeTrack('Hips.position', times, hipsPos)];
+  TRACKED.forEach(function (n) { tracks.push(new THREE.QuaternionKeyframeTrack(n + '.quaternion', times, q[n])); });
+  M.clip = new THREE.AnimationClip('walk', GAIT.cycle, tracks);
+  M.samples = N;
+}
+
+/* the whole pose at phase t, in scan units, in the walking frame */
+function poseAt(t) {
+  var out = { q: {} }, s, i;
+  var bind = M.bind;
+
+  /* ── pelvis ── */
+  var bobT = 4 * Math.PI * (t - 0.155);
+  var dy = (-GAIT.pelvisDrop + GAIT.pelvisBob * Math.sin(bobT)) / M.scale;
+  var dx = -(GAIT.pelvisSway / M.scale) * Math.cos(2 * Math.PI * (t - 0.28));
+  var yaw = GAIT.pelvisYaw * Math.cos(2 * Math.PI * t);          // right side forward with the right leg
+  var obl = GAIT.pelvisObl * Math.sin(2 * Math.PI * (t - 0.55)); // hip drops on the swing side
+  var qHips = new THREE.Quaternion().setFromAxisAngle(AXIS_Y, yaw)
+    .multiply(_q2.setFromAxisAngle(AXIS_Z, obl));
+  out.q.Hips = qHips;
+  var hipsP = V(bind.Hips.x + dx, bind.Hips.y + dy, bind.Hips.z);
+  out.hips = { p: hipsP, q: qHips };
+
+  /* ── trunk, counter-rotating against the pelvis, with a small lean ── */
+  var W = {};   // world quaternions we have committed to, by bone name
+  W.Hips = qHips;
+  function trunk(name, yawK, leanK) {
+    var qq = new THREE.Quaternion().setFromAxisAngle(AXIS_Y, -GAIT.trunkYaw * yawK * Math.cos(2 * Math.PI * t))
+      .multiply(_q2.setFromAxisAngle(AXIS_X, GAIT.lean * leanK));
+    W[name] = qq;
+    out.q[name] = localiseW(name, qq, W);
+    return qq;
+  }
+  trunk('Spine', 0.45, 0.5);
+  trunk('Chest', 1.0, 0.42);
+  /* head stays level and looks where he is going — gaze stabilisation is
+     most of why a walk reads as human rather than as a puppet */
+  var qHead = new THREE.Quaternion().setFromAxisAngle(AXIS_X, -GAIT.lean * 0.55 + 0.012 * Math.sin(4 * Math.PI * t));
+  W.Neck = qHead; out.q.Neck = localiseW('Neck', qHead, W);
+  W.Head = qHead; out.q.Head = localiseW('Head', qHead, W);
+
+  /* ── legs ──
+     The pelvis height is not authored, it is DERIVED. A stride only fits if
+     the hip sits low enough for the stance leg to reach the planted foot
+     without locking straight, so the hip is dropped to whatever the reach
+     allows. That is also what really happens: the longer the stride, the
+     deeper the body sinks at double support. It means the walk stays
+     correct at any speed the slider is dragged to, instead of the foot
+     floating the moment the stride outgrows his legs. */
+  var TG = {};
+  ['R', 'L'].forEach(function (s) {
+    var ph = (s === 'R') ? t : (t + 0.5) % 1;
+    var tgt = ankleTarget(ph, s);
+    /* the ankle target is authored around x=0; put it on this leg's own line,
+       drawn a little toward the midline as it passes the stance leg */
+    tgt.x = M['footX' + s] + (s === 'L' ? -0.014 : 0.014) * Math.sin(Math.PI * ph);
+    TG[s] = { tgt: tgt, ph: ph };
+    if (ph > GAIT.toeOff) return;                       // swing leg does not constrain
+    var reach = (M['L1' + s] + M['L2' + s]) * 0.9975;   // leaves ~8 deg of knee, never a locked stick
+    /* the pelvis tilts, which lifts one hip by a few millimetres — at 99.5%
+       of full extension that is the difference between a bent knee and a
+       leg the solver has to clamp */
+    var hoff = M['hipOff' + s].clone().applyQuaternion(qHips);
+    TG[s].hoff = hoff;
+    var horiz = Math.hypot(tgt.x - (hipsP.x + hoff.x), tgt.z - (hipsP.z + hoff.z));
+    var lim = tgt.y + Math.sqrt(Math.max(0.02, reach * reach - horiz * horiz)) - hoff.y;
+    if (lim < hipsP.y) hipsP.y = lim;
+  });
+  out.hips.p = hipsP;
+
+  ['R', 'L'].forEach(function (s) {
+    var ph = TG[s].ph, tgt = TG[s].tgt;
+    /* pelvis carries the hip */
+    var hip = M['hipOff' + s].clone().applyQuaternion(qHips).add(hipsP);
+    var res = solveIK(hip, tgt, M['L1' + s], M['L2' + s], AXIS_Z.clone(), {});
+    var wUp = new THREE.Quaternion().setFromUnitVectors(M.dir['UpperLeg' + s], res.thigh);
+    var wLo = new THREE.Quaternion().setFromUnitVectors(M.dir['LowerLeg' + s], res.shin);
+    W['UpperLeg' + s] = wUp; W['LowerLeg' + s] = wLo;
+    out.q['UpperLeg' + s] = localiseW('UpperLeg' + s, wUp, W);
+    out.q['LowerLeg' + s] = localiseW('LowerLeg' + s, wLo, W);
+    var wFt = new THREE.Quaternion().setFromAxisAngle(AXIS_X, footPitch(ph) * DEG);
+    W['Foot' + s] = wFt;
+    out.q['Foot' + s] = localiseW('Foot' + s, wFt, W);
+    W['Toe' + s] = wFt;
+    out.q['Toe' + s] = new THREE.Quaternion();
+    if (s === 'R') out.ankleR = tgt; else out.ankleL = tgt;
+  });
+
+  /* ── arms ── */
+  ['L', 'R'].forEach(function (s) {
+    var sign = (s === 'L') ? 1 : -1;
+    var ph = (s === 'R') ? t : (t + 0.5) % 1;
+    var swing = GAIT.armSwing * armCurve(ph);
+    var elb = GAIT.elbow * elbowCurve(ph);
+    var down = V(0, -1, 0);
+    var qOut = new THREE.Quaternion().setFromAxisAngle(AXIS_Z, sign * GAIT.armOut);
+    var upper = down.clone().applyQuaternion(qOut).applyQuaternion(_q.setFromAxisAngle(AXIS_X, -swing));
+    var fore = down.clone().applyQuaternion(qOut).applyQuaternion(_q.setFromAxisAngle(AXIS_X, -swing - elb));
+    var wCl = new THREE.Quaternion().setFromAxisAngle(AXIS_X, -swing * 0.10);
+    W['Clav' + s] = wCl;
+    out.q['Clav' + s] = localiseW('Clav' + s, wCl, W);
+    var wUa = new THREE.Quaternion().setFromUnitVectors(M.dir['UpperArm' + s], upper);
+    W['UpperArm' + s] = wUa;
+    out.q['UpperArm' + s] = localiseW('UpperArm' + s, wUa, W);
+    var wFa = new THREE.Quaternion().setFromUnitVectors(M.dir['ForeArm' + s], fore);
+    W['ForeArm' + s] = wFa;
+    out.q['ForeArm' + s] = localiseW('ForeArm' + s, wFa, W);
+    var wHd = wFa;
+    W['Hand' + s] = wHd;
+    out.q['Hand' + s] = localiseW('Hand' + s, wHd, W);
+  });
+  return out;
+}
+
+/* bind rotations in this rig are all identity, so a bone's world rotation is
+   just the product down the chain — which makes "put this bone at this world
+   orientation" a single inverse multiply. */
+var PARENT = {
+  Spine: 'Hips', Chest: 'Spine', Neck: 'Chest', Head: 'Neck',
+  ClavL: 'Chest', UpperArmL: 'ClavL', ForeArmL: 'UpperArmL', HandL: 'ForeArmL',
+  ClavR: 'Chest', UpperArmR: 'ClavR', ForeArmR: 'UpperArmR', HandR: 'ForeArmR',
+  UpperLegL: 'Hips', LowerLegL: 'UpperLegL', FootL: 'LowerLegL', ToeL: 'FootL',
+  UpperLegR: 'Hips', LowerLegR: 'UpperLegR', FootR: 'LowerLegR', ToeR: 'FootR'
+};
+var QINV = THREE.Quaternion.prototype.invert ? 'invert' : 'inverse';
+function localiseW(name, world, W) {
+  var p = PARENT[name], pw = W[p];
+  if (!pw) return world.clone();
+  return pw.clone()[QINV]().multiply(world);
+}
+
+/* ───────── foot trace: draws where each ankle has actually been ───────── */
+var trail = null;
+function makeTrail() {
+  var pts = [], N = 240, s;
+  var g = new THREE.BufferGeometry();
+  var pos = new Float32Array(N * 2 * 3);
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  trail = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.028, color: 0xffd166, sizeAttenuation: true }));
+  trail.visible = false; trail.frustumCulled = false;
+  scene.add(trail);
+  M.trailN = N; M.trailI = 0;
+}
+
+/* ───────────────────────────── cameras ───────────────────────────── */
+var camA = new THREE.PerspectiveCamera(33, 1, 0.1, 200);
+var camB = new THREE.PerspectiveCamera(33, 1, 0.1, 200);
+var camS = new THREE.PerspectiveCamera(30, 1, 0.1, 200);   // the phase strip
+
+/* ───────────────────────────── loop ───────────────────────────── */
+var ready = false, playing = true, showBind = false, half = false, strip = false;
+var clock = new THREE.Clock();
+var travel = 0, fps = 60, acc = 0, frames = 0, last = performance.now();
+var statEl = document.getElementById('stat');
+
+function resize() {
+  var w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  var vh = h - BAR;
+  camA.aspect = (w / 2) / vh; camA.updateProjectionMatrix();
+  camB.aspect = (w / 2) / vh; camB.updateProjectionMatrix();
+}
+addEventListener('resize', resize); resize();
+
+function frame() {
+  requestAnimationFrame(frame);
+  var dt = Math.min(clock.getDelta(), 0.05);
+  if (half) dt *= 0.5;
+
+  if (ready) {
+    if (playing && !showBind) {
+      mixer.update(dt);
+      travel += M.speed * dt * (half ? 1 : 1);
+      M.rig.position.z = travel;
+    }
+    if (showBind) { mixer.setTime(0); M.rig.position.z = travel; }
+    if (helper.visible) helper.update();
+
+    /* Cameras ride alongside at 4 m, so the ground slides past him and any
+       foot that is not planted gives itself away. He walks +Z, and both
+       cameras sit on his left so +Z reads left-to-right on screen. */
+    var cx = M.bind.Hips.x * M.scale, cy = 0.92, cz = travel;
+    camA.position.set(cx + 4.0, 1.00, cz);
+    camA.lookAt(cx, cy, cz);
+    camB.position.set(cx + 2.30, 1.22, cz + 3.28);      // 35° off the walk axis, 4 m out
+    camB.lookAt(cx, cy - 0.02, cz + 0.06);
+    sun.position.set(cx + 2.9, 6.3, cz + 5.2);
+    sun.target.position.set(cx, 0.9, cz); sun.target.updateMatrixWorld();
+
+    if (trail.visible && playing) pushTrail();
+  }
+
+  var w = innerWidth, h = innerHeight;
+  if (strip && ready) drawStrip(w, h);
+  else {
+    var vh = h - BAR;
+    renderer.setScissorTest(true);
+    renderer.setViewport(0, BAR, w / 2, vh); renderer.setScissor(0, BAR, w / 2, vh);
+    renderer.render(scene, camA);
+    renderer.setViewport(w / 2, BAR, w / 2, vh); renderer.setScissor(w / 2, BAR, w / 2, vh);
+    renderer.render(scene, camB);
+    renderer.setScissorTest(false);
+  }
+
+  frames++; var now = performance.now(); acc += now - last; last = now;
+  if (acc > 420) { fps = 1000 * frames / acc; frames = 0; acc = 0; stat(); }
+}
+
+/* ── the cycle, laid out flat ──────────────────────────────────────────────
+   A walk cannot be judged from one frame. This freezes eight phases of the
+   same stride side by side, each stepped one eighth of a stride along the
+   ground, so heel strike, loading, mid-stance, toe-off and swing can all be
+   read at once — and so a still screenshot carries the whole cycle.        */
+var STRIP_N = 8, STRIP_COLS = 4, STRIP_BAR = 48;
+var PHASE_NAME = ['heel strike', 'loading response', 'mid-stance', 'terminal stance',
+  'toe-off', 'early swing', 'mid-swing', 'reach'];
+function drawStrip(w, h) {
+  var rows = STRIP_N / STRIP_COLS, cw = w / STRIP_COLS, gh = h - STRIP_BAR, ch = gh / rows;
+  var baseZ = M.rig.position.z, i;
+  var lab = document.getElementById('striplab'), html = '';
+  renderer.setScissorTest(true);
+  for (i = 0; i < STRIP_N; i++) {
+    var ph = i / STRIP_N, col = i % STRIP_COLS, row = (i / STRIP_COLS) | 0;
+    action.time = ph * GAIT.cycle;
+    mixer.update(0);
+    var z = baseZ + ph * GAIT.stride;
+    M.rig.position.z = z;
+    model.updateMatrixWorld(true);
+    var cx = M.bind.Hips.x * M.scale;
+    camS.position.set(cx + 4.0, 0.96, z + 0.02);
+    camS.lookAt(cx, 0.88, z + 0.02);
+    camS.aspect = cw / ch; camS.updateProjectionMatrix();
+    sun.position.set(cx + 2.9, 6.3, z + 5.2);
+    sun.target.position.set(cx, 0.9, z); sun.target.updateMatrixWorld();
+    var vx = col * cw, vy = gh - (row + 1) * ch;
+    renderer.setViewport(vx, vy, cw, ch); renderer.setScissor(vx, vy, cw, ch);
+    renderer.render(scene, camS);
+    html += '<div style="position:fixed;left:' + (vx + 10) + 'px;top:' + (STRIP_BAR + row * ch + 8) + 'px;' +
+      'font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:#fff;opacity:.85;text-shadow:0 1px 6px #000;' +
+      'white-space:nowrap"><b style="color:#ffd166">' + (ph * 100).toFixed(0) + '%</b> · ' + PHASE_NAME[i] + '</div>';
+    if (col) html += '<div style="position:fixed;top:' + (STRIP_BAR + row * ch) + 'px;height:' + ch + 'px;left:' + vx + 'px;width:1px;background:rgba(255,255,255,.16)"></div>';
+    if (row) html += '<div style="position:fixed;left:' + vx + 'px;width:' + cw + 'px;top:' + (STRIP_BAR + row * ch) + 'px;height:1px;background:rgba(255,255,255,.16)"></div>';
+  }
+  renderer.setScissorTest(false);
+  M.rig.position.z = baseZ;
+  html += '<div style="position:fixed;left:0;right:0;top:0;height:' + STRIP_BAR + 'px;background:#0d0f12;' +
+    'border-bottom:1px solid rgba(255,255,255,.12);display:flex;align-items:center;gap:16px;padding:0 14px;' +
+    'font-size:10px;letter-spacing:.04em;white-space:nowrap;overflow:hidden"><b style="letter-spacing:.16em;text-transform:uppercase;color:#b9d8ff">' +
+    'The trainer — one stride</b><span style="opacity:.72">' + GAIT.stride.toFixed(2) + ' m stride · ' +
+    (GAIT.stride / GAIT.cycle).toFixed(2) + ' m/s · ' + GAIT.cycle.toFixed(2) + ' s cycle · side · 4 m</span>' +
+    '<span style="opacity:.72">contact slip <b style="color:#6ee7a0">' + (M.skate || 0).toFixed(1) + ' mm</b></span>' +
+    (bench ? '<span style="opacity:.72">' + (1000 / bench.ms).toFixed(0) + ' fps measured</span>' : '') + '</div>';
+  if (lab.innerHTML !== html) lab.innerHTML = html;
+}
+
+var tv = new THREE.Vector3();
+function pushTrail() {
+  var g = trail.geometry, p = g.attributes.position.array;
+  ['FootL', 'FootR'].forEach(function (n, k) {
+    BONE[n].getWorldPosition(tv);
+    var i = ((M.trailI * 2 + k) % (M.trailN * 2)) * 3;
+    p[i] = tv.x; p[i + 1] = 0.012; p[i + 2] = tv.z;
+  });
+  M.trailI++;
+  g.attributes.position.needsUpdate = true;
+}
+
+/* A hidden browser pane throttles requestAnimationFrame, so live fps lies.
+   This renders both viewports back to back and reports real milliseconds. */
+var bench = null;
+function runBench() {
+  if (!ready) return;
+  var w = innerWidth, h = innerHeight, N = 140, i;
+  for (i = 0; i < 12; i++) { mixer.update(0.0166); renderer.render(scene, camA); }   // warm up
+  var gl = renderer.getContext(), px = new Uint8Array(4);
+  var t0 = performance.now();
+  for (i = 0; i < N; i++) {
+    mixer.update(0.0166);
+    renderer.setScissorTest(true);
+    renderer.setViewport(0, 0, w / 2, h); renderer.setScissor(0, 0, w / 2, h);
+    renderer.render(scene, camA);
+    renderer.setViewport(w / 2, 0, w / 2, h); renderer.setScissor(w / 2, 0, w / 2, h);
+    renderer.render(scene, camB);
+    renderer.setScissorTest(false);
+    gl.readPixels(1, 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);   // stall on the GPU
+  }
+  /* WebGL queues work; without a blocking read the timer only measures how
+     fast we can hand commands to the driver. readPixels stalls until the GPU
+     has actually caught up, which is the number that matters. */
+  var ms = (performance.now() - t0) / N;
+  bench = { ms: ms, one: ms / 2 };
+  stat();
+  return bench;
+}
+
+function stat() {
+  var apiOk = API.filter(function (a) { return a.ok; }).length;
+  var bad = API.filter(function (a) { return !a.ok; }).map(function (a) { return a.n; });
+  statEl.innerHTML =
+    (bench ? '<span><b>' + Math.min(999, 1000 / bench.ms).toFixed(0) + ' fps</b> ' + bench.ms.toFixed(1) + 'ms/2views ' +
+      (bench.ms < 16.6 ? '<span class="ok">✓</span>' : '<span class="bad">over</span>') + '</span>' : '<span>measuring…</span>') +
+    '<span>slip <b class="' + (M.skate < 4 ? 'ok' : 'bad') + '">' + (M.skate === undefined ? '—' : M.skate.toFixed(1) + 'mm') + '</b></span>' +
+    '<span>' + (M.verts || 0).toLocaleString() + 'v · ' + (skel ? skel.bones.length : 0) + ' bones</span>' +
+    '<span>r' + REV + ' api ' + (bad.length ? '<b class="bad">' + apiOk + '/' + API.length + '</b>' : '<b class="ok">' + apiOk + '/' + API.length + '</b>') + '</span>' +
+    '<span>net <b class="ok">0</b></span>' +
+    (bad.length ? '<span class="bad">missing: ' + bad.join(', ') + '</span>' : '');
+}
+
+/* How far the planted foot actually slides over the ground during stance.
+   This is the number that decides whether a walk reads as real. */
+function measureSkate() {
+  /* The ankle is SUPPOSED to move during stance — the foot rolls over it.
+     What must not move is the part touching the ground, so that is what
+     gets measured: heel while the heel is down, toe once it lifts. */
+  var worst = 0;
+  ['L', 'R'].forEach(function (s) {
+    /* heel and toe are different points on the ground, so each is only
+       checked over the span it is actually the one bearing weight */
+    [[0, 0.22, 'heel'], [0.22, GAIT.toeOff, 'toe']].forEach(function (seg) {
+      var lo = 1e9, hi = -1e9;
+      for (var i = 0; i <= 40; i++) {
+        var ph = seg[0] + (seg[1] - seg[0]) * i / 40;
+        var a = ankleTarget(ph, s);
+        var p = footPitch(ph) * DEG, cp = Math.cos(p), sp = Math.sin(p);
+        var piv = M[seg[2] + s];
+        var z = a.z + (piv.y * sp + piv.z * cp) + (GAIT.stride / M.scale) * ph;
+        if (z < lo) lo = z; if (z > hi) hi = z;
+      }
+      worst = Math.max(worst, hi - lo);
+    });
+  });
+  M.skate = worst * M.scale * 1000;   // mm the loaded contact point slides
+}
+
+/* ───────────────────────────── controls ───────────────────────────── */
+function bind(id, f) { document.getElementById(id).addEventListener('input', f); }
+bind('sp', function (e) {
+  GAIT.stride = +e.target.value * GAIT.cycle;
+  document.getElementById('spv').textContent = (+e.target.value).toFixed(2);
+  rebake();
+});
+bind('cd', function (e) {
+  var v = +e.target.value;
+  GAIT.stride = GAIT.stride / GAIT.cycle * v; GAIT.cycle = v;
+  document.getElementById('cdv').textContent = v.toFixed(2);
+  rebake();
+});
+bind('as', function (e) {
+  GAIT.armSwing = +e.target.value * DEG;
+  document.getElementById('asv').textContent = e.target.value;
+  rebake();
+});
+function rebake() {
+  if (!ready) return;
+  M.speed = GAIT.stride / GAIT.cycle;
+  var was = action ? action.time : 0;
+  bakeClip();
+  mixer.stopAllAction();
+  action = mixer.clipAction(M.clip);
+  action.setLoop(THREE.LoopRepeat, Infinity);
+  action.play(); action.time = was % GAIT.cycle;
+  measureSkate();
+}
+function toggle(id, f) {
+  var b = document.getElementById(id);
+  b.addEventListener('click', function () { b.classList.toggle('on'); f(b.classList.contains('on')); });
+}
+document.getElementById('bPlay').addEventListener('click', function () {
+  playing = !playing; this.classList.toggle('on', playing); this.textContent = playing ? '❚❚' : '▶';
+});
+toggle('bBone', function (v) { if (helper) helper.visible = v; });
+toggle('bBind', function (v) { showBind = v; });
+toggle('bTrail', function (v) { if (trail) trail.visible = v; });
+toggle('bSlow', function (v) { half = v; });
+toggle('bStrip', function (v) {
+  strip = v;
+  document.getElementById('hud').style.display = v ? 'none' : '';
+  document.getElementById('stat').style.display = v ? 'none' : '';
+  document.getElementById('split').style.display = v ? 'none' : '';
+  document.getElementById('labA').style.display = v ? 'none' : '';
+  document.getElementById('labB').style.display = v ? 'none' : '';
+  document.getElementById('striplab').style.display = v ? '' : 'none';
+});
+
+frame();
+</script>
