@@ -72,11 +72,20 @@
        asked to move slowly walks — she does not trot in slow motion, and a
        slow-motion trot is one of those things that looks wrong without anyone
        being able to say why. */
+    /* A foot PLANTS at p = 0, so its landing time in the cycle is (1 - phW).
+       The old offsets landed them RH, LF, LH, RF — read from the right hind
+       that is RH, RF's diagonal partner, then LH, then RF. Same-side pairs
+       never followed each other, which is the DIAGONAL sequence: how a primate
+       walks, and wrong for a dog by a quarter cycle on every foot.
+
+       A dog walks lateral sequence — each hind foot followed by the fore foot
+       on the SAME side, LH, LF, RH, RF, a quarter cycle apart. Solved from
+       phW = 1 - landing rather than nudged until it looked better. */
     legs: [
-      { id: 'fl', f:  0.205, s: -0.039, fore: 1, ph: 0.00, phW: 0.00 },
-      { id: 'fr', f:  0.184, s: -0.204, fore: 1, ph: 0.50, phW: 0.50 },
-      { id: 'hl', f: -0.322, s:  0.081, fore: 0, ph: 0.50, phW: 0.75 },
-      { id: 'hr', f: -0.385, s: -0.140, fore: 0, ph: 0.00, phW: 0.25 }
+      { id: 'fl', f:  0.205, s: -0.039, fore: 1, ph: 0.00, phW: 0.75 },
+      { id: 'fr', f:  0.184, s: -0.204, fore: 1, ph: 0.50, phW: 0.25 },
+      { id: 'hl', f: -0.322, s:  0.081, fore: 0, ph: 0.50, phW: 0.00 },
+      { id: 'hr', f: -0.385, s: -0.140, fore: 0, ph: 0.00, phW: 0.50 }
     ],
     jointY: { fore: -0.020, hind: -0.045 },
     kneeY:  { fore: -0.235, hind: -0.215 },
@@ -626,8 +635,12 @@
      stands square rather than frozen mid-stride. */
   function poseLegs(phase, speed) {
     var swing = clamp(speed / 2.4, 0, 1);
-    var A = 0.34 * swing;                   // radians at the shoulder
-    var B = 0.46 * swing;                   // radians at the knee, swing phase only
+    /* Radians at the knee, swing phase only — this is what LIFTS the paw,
+       because there is no IK and nothing else raises it off the ground. At
+       0.46 the foot cleared 8 mm and she dragged each paw to the next print.
+       1.35 measures 4.3 cm at the front and 2.8 cm behind, which is where a
+       real dog walks. */
+    var B = 1.35 * swing;
 
     /* Walk below about 1 m/s, trot above about 1.6, and blend across the gap.
        DUTY is the fraction of the cycle a foot spends on the ground: about
@@ -636,17 +649,49 @@
     var trotness = smooth(1.05, 1.65, speed);
     var duty = lerp(0.62, 0.50, trotness);
 
+    /* THE SHOULDER ANGLE IS NOT A FREE CONSTANT. It was 0.34 x swing, a number
+       with no relationship to the ground, and the result was a paw that swept
+       back 5 cm while the body moved 55 cm underneath it — 91% slip, the
+       skating that made every step read as fake. Reversing the sweep earlier
+       fixed its DIRECTION; this fixes its SIZE.
+
+       A planted paw is still only if it sweeps back exactly as far as the body
+       goes forward. The body covers `stride` per cycle and the foot is down for
+       `duty` of it, so the paw must travel stride*duty. Its horizontal reach is
+       legLen*sin(th), so the sweep from -A to +A covers 2*legLen*sin(A), and A
+       falls straight out as an arcsine. Nothing here is tuned.
+
+       stride must match stepDog's own formula exactly — it is the same curve,
+       and if the two ever disagree the lock silently breaks. */
+    var stride = lerp(0.62, 1.05, swing);
+    var groundRun = stride * duty;
+    /* At rest the derivation is meaningless — she is not covering ground — so
+       fade the whole thing out below walking pace and let her stand square. */
+    var mv = clamp(speed / 0.30, 0, 1);
+
     for (var i = 0; i < RIG.legs.length; i++) {
       var L = RIG.legs[i], b = boneOf[L.id];
+      /* Solved per leg, because the front and hind columns are not the same
+         length. One shared angle made the shorter hind leg under-reach, so the
+         back feet skated even once the front ones had stopped. */
+      var legLen = ((L.fore ? RIG.jointY.fore : RIG.jointY.hind) - RIG.ground) * M;
+      var A = Math.asin(clamp(groundRun / (2 * legLen), 0, 0.92)) * mv;
       var off = lerp(L.phW, L.ph, trotness);
       var p = (phase + off) % 1;
       var th, fold;
-      if (p < duty) {                       // planted
-        th = A * (1 - 2 * (p / duty));
+      if (p < duty) {
+        /* PLANTED, and this ran backwards. A positive angle about the side
+           axis carries the paw REARWARD, so sweeping +A down to -A drove every
+           planted foot forward under her while her body also went forward —
+           measured at the paw, all four travelled the wrong way, which is the
+           skating that made the walk read as fake. A foot lands protracted and
+           is left behind as the body passes over it, so the sweep runs -A up
+           to +A and the paw holds still against the ground. */
+        th = A * (2 * (p / duty) - 1);
         fold = 0;
-      } else {                              // through the air
+      } else {                              // through the air, reaching forward again
         var u = (p - duty) / (1 - duty);
-        th = -A + 2 * A * (u * u * (3 - 2 * u));
+        th = A - 2 * A * (u * u * (3 - 2 * u));
         fold = Math.sin(u * Math.PI) * B;
       }
       /* The hock folds the opposite way to the carpus — a hind leg that bends
@@ -3342,7 +3387,9 @@
     /* The two rigs themselves. A gait fault is a claim about where a limb is
        at a given instant, and that is a number, not something to be squinted
        at in a screenshot — which is exactly how a wrong one got believed. */
-    rigs: function () { return { man: handlerObj, dog: dogRoot, st: st }; },
+    rigs: function () {
+      return { man: handlerObj, dog: dogRoot, st: st, legs: boneOf, rig: RIG, M: M };
+    },
 
     /* Where the line's two ends actually are, in the world and on the screen.
        "The leash looks like it joins her at the wrong end" is not answerable
