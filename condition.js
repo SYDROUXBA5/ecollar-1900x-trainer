@@ -770,6 +770,381 @@
      the paws and hang the line in mid-air. Ground truth beats a nicer skyline.
      Turning it on means giving terrainH a JavaScript twin and placing both
      bodies on it — a separate change, not a free one. */
+  /* ─────────────────────────────────────────────────────────────────────────
+     THE SKY
+
+     Preetham scattering with two cloud decks over it. The five quantities
+     three.js recomputes per vertex (sun direction, sunE, sunfade, betaR,
+     betaM) do not vary across the dome at all — they depend only on the sun
+     and the settings — so they are solved once per frame on the CPU below and
+     passed in. Arithmetically identical, and much cheaper.
+
+     ONE TONE CURVE, NOT TWO. The prototype graded itself with AgX and wrote
+     final sRGB straight to the framebuffer. Dropped in here that would put two
+     different tone curves on one screen — AgX sky above an ACES-tone-mapped
+     field — and they part company at exactly the join the eye is most likely
+     to check. So this outputs LINEAR radiance and goes through the shell's own
+     tonemapping_fragment, the same as the grass. uSkyExposure is what brings
+     Preetham's radiance into the range that curve expects, and it was set by
+     measuring the rendered histogram, not by eye. */
+  var SKY_P = {
+    elev: 15, azim: 143, turbidity: 3.0, rayleigh: 1.7, mieCoef: 0.005, mieG: 0.80,
+    coverage: 0.55, cloudDens: 1.25, cloudH: 1.10, cloudScale: 0.55,
+    sharp: 0.15, erode: 0.55, cirrus: 0.55, shafts: 0.85, haze: 0.55,
+    /* Preetham radiance times AgX-at-0.5 is not the same number as Preetham
+       radiance times ACES-at-1.06. This is the bridge between them, and it is
+       the one value here that was SOLVED rather than chosen: swept across two
+       decades, reading the rendered histogram back off the framebuffer at each
+       step. 0.021 put the sky at a median of 25 — near black. 0.70 put it at
+       215 and the blue had already started washing to white, which is the road
+       to the blown-out frame this project shipped once before.
+
+       0.22 gives median (130, 152, 155) with the 99th percentile at 215: a
+       properly exposed daylight sky with headroom still above it for the sunlit
+       cloud tops, and not one clipped pixel. */
+    exposure: 0.22
+  };
+  var TOTAL_RAYLEIGH = [5.804542996261093e-6, 1.3562911419845635e-5, 3.0265902468824876e-5];
+  var MIE_CONST = [1.8399918514433978e14, 2.7798023919660528e14, 4.0790479543861094e14];
+  var SKY_CUTOFF = 1.6110731556870734, SKY_STEEP = 1.5, SKY_EE = 1000.0;
+  var RAY_ZEN = 8.4e3, MIE_ZEN = 1.25e3;
+  var skyMesh = null, SU = null, sunDir = null;
+
+  function inverseOptical(dirY) {
+    var za = Math.acos(Math.max(0, Math.min(1, dirY)));
+    return 1 / (Math.cos(za) + 0.15 * Math.pow(Math.max(93.885 - za * 180 / Math.PI, 1e-3), -1.253));
+  }
+
+  /* One tap, four independent smooth value-noise fields. Offsetting half a
+     texel lets the hardware's bilinear filter do the interpolation, and
+     because all four channels interpolate together a domain warp rides along
+     for free on whatever octave already fetched them. */
+  function makeNoiseTexture() {
+    var N = 256, data = new Uint8Array(N * N * 4), s = 1234567;
+    function rnd() { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; }
+    for (var i = 0; i < N * N; i++) {
+      data[i * 4] = rnd() * 255; data[i * 4 + 1] = rnd() * 255;
+      data[i * 4 + 2] = rnd() * 255; data[i * 4 + 3] = rnd() * 255;
+    }
+    var t = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.magFilter = t.minFilter = THREE.LinearFilter;
+    t.generateMipmaps = false;
+    t.needsUpdate = true;
+    return t;
+  }
+
+  var SKY_FRAG = [
+    'uniform sampler2D uNoise;',
+    'uniform vec3 uSunDir, uBetaR, uBetaM, uSunColor, uSkyAmb, uHorizonCol;',
+    'uniform vec3 uFexH;',
+    'uniform float uSunE, uMieG, uTime, uExposure;',
+    'uniform float uCoverage, uCloudDens, uCloudH, uCloudScale, uSharp, uErode;',
+    'uniform float uCirrus, uShafts, uHaze;',
+    'uniform vec2 uWind;',
+    'varying vec3 vWorld;',
+    'const float PI = 3.141592653589793;',
+    'const float SUN_COS = 0.9999566769;',
+    'const float T3_16PI = 0.05968310365946075;',
+    'const float ONE_4PI = 0.07957747154594767;',
+    'const float EARTH_KM = 6371.0;',
+    'const float RAY_ZEN = 8400.0;',
+    'const float MIE_ZEN = 1250.0;',
+    /* QUINTIC weight, not the usual cubic. Cubic smoothstep is only C1 — its
+       second derivative jumps at every lattice line, and when a cloud's
+       coverage threshold slices through that field the kinks show up as hard
+       polygonal facets along the cloud edge. Quintic is C2 and they vanish. */
+    'vec4 nz4(vec2 x){',
+    '  vec2 p = floor(x), f = fract(x);',
+    '  f = f*f*f*(f*(f*6.0 - 15.0) + 10.0);',
+    '  return texture2D(uNoise, (p+f+0.5)*(1.0/256.0));',
+    '}',
+    'float shash21(vec2 p){',
+    '  vec3 q = fract(vec3(p.xyx) * 0.1031);',
+    '  q += dot(q, q.yzx + 33.33);',
+    '  return fract((q.x + q.y) * q.z);',
+    '}',
+    /* Two fbms, not one with a weight. Weighting an octave by zero does NOT
+       skip its texture fetch — the GPU evaluates it and multiplies by zero, so
+       a "LOD" of that shape costs full price. These branch instead, and the
+       branches are screen-space coherent because detail is a function of
+       distance, so whole warps take the same path. */
+    'float fbmLo(vec2 p){',
+    '  vec4 n0 = nz4(p);',
+    '  p += (n0.yz - 0.5) * 0.85;',
+    '  return (0.5*n0.x + 0.25*nz4(p*2.03 + 11.7).x) * 1.3333;',
+    '}',
+    /* hi hands back the highest octave this call actually reached. It has
+       already been fetched and weighted in at 3%, where it does nothing
+       visible; handed out separately it erodes the silhouette for zero extra
+       taps. That is the difference between a cloud edge and a cut-out. */
+    'float fbmHi(vec2 p, float detail, out float hi){',
+    '  vec4 n0 = nz4(p);',
+    '  p += (n0.yz - 0.5) * 0.85;',
+    '  float f = 0.5 * n0.x;',
+    '  hi = n0.x;',
+    '  p = p*2.03 + 11.7;  float n = nz4(p).x;  f += 0.2500 * n;  hi = n;',
+    '  if (detail > 0.02) {',
+    '    p = p*2.01 + 3.1;  n = nz4(p).x;  f += 0.1250 * n * min(detail*3.0, 1.0);  hi = n;',
+    '    if (detail > 0.34) {',
+    '      p = p*2.04 + 7.3;  n = nz4(p).x;  f += 0.0625 * n;  hi = n;',
+    '      if (detail > 0.68) { p = p*2.02 + 5.9;  n = nz4(p).x;  f += 0.0312 * n;  hi = n; }',
+    '    }',
+    '  }',
+    '  return f * 1.0323;',
+    '}',
+    'float rayleighPhase(float c){ return T3_16PI * (1.0 + c*c); }',
+    'float hgPhase(float c, float g){',
+    '  float g2 = g*g;',
+    '  return ONE_4PI * ((1.0-g2) / pow(max(1.0 - 2.0*g*c + g2, 1e-4), 1.5));',
+    '}',
+    'vec3 extinction(float dirY){',
+    '  float za = acos(max(0.0, dirY));',
+    '  float inv = 1.0 / (cos(za) + 0.15 * pow(max(93.885 - za*180.0/PI, 1e-3), -1.253));',
+    '  return exp(-(uBetaR*RAY_ZEN*inv + uBetaM*MIE_ZEN*inv));',
+    '}',
+    'vec3 scatter(vec3 dir, vec3 Fex){',
+    '  float cosTheta = dot(dir, uSunDir);',
+    '  vec3 bR = uBetaR * rayleighPhase(cosTheta*0.5 + 0.5);',
+    '  vec3 bM = uBetaM * hgPhase(cosTheta, uMieG);',
+    '  vec3 sum = uBetaR + uBetaM;',
+    '  vec3 Lin = pow(max(uSunE * ((bR+bM)/sum) * (1.0-Fex), 0.0), vec3(1.5));',
+    '  Lin *= mix(vec3(1.0), pow(max(uSunE * ((bR+bM)/sum) * Fex, 0.0), vec3(0.5)),',
+    '             clamp(pow(max(1.0 - uSunDir.y, 0.0), 5.0), 0.0, 1.0));',
+    '  return (Lin + vec3(0.1) * Fex) * 0.04 + vec3(0.0, 0.0003, 0.00075);',
+    '}',
+    /* Ray/shell intersection, not ray/plane. A flat cloud plane sends t to
+       infinity at the horizon and the noise frequency explodes with it; a
+       shell at radius EARTH+h tops out at the real horizon distance and
+       compresses the deck the way a real sky does. */
+    'float shellT(vec3 dir, float hKm){',
+    '  float b = EARTH_KM * dir.y;',
+    '  return -b + sqrt(b*b + 2.0*EARTH_KM*hKm + hKm*hKm);',
+    '}',
+    /* The width of this smoothstep IS the difference between a cumulus and a
+       smear: wide gives soft lenticular sheets, narrow gives the hard
+       cauliflower edge that reads as a real cloud against sky. */
+    'float coverageOf(float f){ return smoothstep(1.0 - uCoverage, 1.0 - uCoverage + uSharp, f); }',
+    'float cloudDensityLo(vec2 uv){ return coverageOf(fbmLo(uv)); }',
+    'float erodeF(float d, float hi, float amt){',
+    '  float k = hi * amt;',
+    '  return clamp((d - k) / max(1.0 - k, 1e-3), 0.0, 1.0);',
+    '}',
+    'vec4 cumulus(vec3 dir){',
+    '  if (dir.y <= 0.0015) return vec4(0.0);',
+    '  float t  = shellT(dir, uCloudH);',
+    '  vec2  uv = dir.xz * t * uCloudScale + uWind;',
+    '  float detail = 1.0 - smoothstep(4.0, 45.0, t);',
+    '  float hi;',
+    '  float d = coverageOf(fbmHi(uv, detail, hi));',
+    '  d = erodeF(d, hi, uErode * detail);',
+    '  if (d <= 0.002) return vec4(0.0);',
+    /* Self-shadowing: two taps back along the sun, offset by cot(elevation),
+       so a low sun rakes right across the deck and a high sun barely marks it. */
+    '  vec2 sdir = (uSunDir.xz / max(uSunDir.y, 0.14)) * uCloudScale;',
+    '  float s1 = cloudDensityLo(uv + sdir*0.09);',
+    '  float s2 = cloudDensityLo(uv + sdir*0.30);',
+    '  float shadow = exp(-(s1*1.25 + s2*0.85) * uCloudDens * 1.7);',
+    /* A 2D density field lit by a 2D shadow lookup is a flat sheet. What makes
+       cumulus read as lumps is the slope of the top surface facing the sun,
+       and s1 is already the density one step sunward — so (d - s1) IS that
+       slope along the only axis N.L cares about. The billows cost nothing. */
+    '  float relief = clamp(uSunDir.y*1.35 + (d - s1)*3.4, 0.0, 1.45);',
+    '  float cosT = dot(dir, uSunDir);',
+    /* Forward lobe = the silver lining. The small back lobe keeps the far side
+       of every cloud from going flat grey. */
+    '  float hg = hgPhase(cosT, 0.78)*2.4 + hgPhase(cosT, -0.25)*0.55 + 0.42;',
+    '  float powder = 1.0 - exp(-uCloudDens * d * 6.0);',
+    /* Scaled by the sun's ACTUAL irradiance. Sunlit cloud tops are the
+       brightest thing in a daylight sky short of the disc; a cloud darker than
+       the sky behind it is the loudest tell of a fake one. */
+    '  vec3 lit  = uSunColor * uSunE * 0.0115 * shadow * relief * hg * powder;',
+    '  lit      += uSkyAmb * (0.45 + 0.55*d) * 1.5;',
+    '  float a = 1.0 - exp(-uCloudDens * d * 5.5);',
+    '  a *= exp(-t * uHaze * 0.020);',
+    '  a *= smoothstep(0.0, 0.030, dir.y);',
+    '  return vec4(lit * a, a);',
+    '}',
+    /* A second, much higher, much thinner deck. Three taps, and it is most of
+       what separates a sky from a blue gradient with cumulus pasted on. */
+    'vec4 cirrusDeck(vec3 dir){',
+    '  if (dir.y <= 0.004 || uCirrus < 0.01) return vec4(0.0);',
+    '  float t  = shellT(dir, 7.5);',
+    '  vec2  uv = dir.xz * t * 0.075 + uWind*0.35;',
+    '  uv.x *= 0.30;',
+    '  float f = fbmLo(uv) * 0.72 + nz4(uv*3.7 + 21.0).w * 0.28;',
+    '  float d = smoothstep(0.50, 0.80, f) * uCirrus;',
+    '  if (d <= 0.002) return vec4(0.0);',
+    '  float cosT = dot(dir, uSunDir);',
+    '  float hg = hgPhase(cosT, 0.80)*3.0 + 0.85;',
+    '  vec3 lit = uSunColor * uSunE * 0.0075 * hg + uSkyAmb * 1.1;',
+    '  float a = d * 0.55 * exp(-t*uHaze*0.006) * smoothstep(0.004, 0.06, dir.y);',
+    '  return vec4(lit*a, a);',
+    '}',
+    /* Crepuscular rays, branched to the ~13% of the hemisphere within 44 deg
+       of the sun, so on average they cost almost nothing. */
+    'float lightShaft(vec3 dir){',
+    '  float cosT = dot(dir, uSunDir);',
+    '  if (uShafts < 0.01 || cosT < 0.72 || uSunDir.y < -0.02) return 0.0;',
+    '  float acc = 0.0;',
+    '  for (int i = 1; i <= 4; i++) {',
+    '    vec3 d = normalize(mix(dir, uSunDir, float(i)/4.0 * 0.88));',
+    '    if (d.y <= 0.01) { acc += 1.0; continue; }',
+    '    float t = shellT(d, uCloudH);',
+    '    acc += 1.0 - cloudDensityLo(d.xz*t*uCloudScale + uWind);',
+    '  }',
+    '  acc *= 0.25;',
+    '  return acc*acc * smoothstep(0.72, 0.998, cosT) * uShafts;',
+    '}',
+    'void main(){',
+    '  vec3 dir = normalize(vWorld - cameraPosition);',
+    '  vec3 Fex = extinction(dir.y);',
+    '  vec3 L = scatter(dir, Fex);',
+    '  float cosT = dot(dir, uSunDir);',
+    /* Preetham's own disc is a hard smoothstep that reads as a sticker. A real
+       sun has a limb-darkened core that blows to white and a halo that spreads
+       for tens of degrees. */
+    '  float edge = smoothstep(SUN_COS - 0.000035, SUN_COS + 0.000012, cosT);',
+    '  float r2   = clamp((1.0 - cosT) / (1.0 - SUN_COS), 0.0, 1.0);',
+    '  vec3  disc = uSunE * 16000.0 * Fex * edge * mix(1.0, 0.58, r2*r2);',
+    /* Four glare lobes off ONE base. pow(x,n) is exp2(n*log2(x)), so sharing
+       the log2 turns four transcendental pairs into one log2 and four exp2. */
+    '  float ls = log2(max(cosT, 1e-8));',
+    '  float glare = exp2(7000.0*ls)*3.2 + exp2(750.0*ls)*0.85',
+    '              + exp2(  85.0*ls)*0.16 + exp2(  7.0*ls)*0.020;',
+    /* Clouds first, so their transmittance can eat the disc and the glare. A
+       sun that keeps blazing through a cumulus is the tell of a fake sky. */
+    '  vec4 cu = cumulus(dir), ci = cirrusDeck(dir);',
+    '  float trans = (1.0 - cu.a) * (1.0 - ci.a);',
+    '  L += (disc + uSunColor*glare*uSunE*0.055) * trans;',
+    '  L += uSunColor * lightShaft(dir) * 0.34 * uSunE * 0.0016;',
+    '  L = L*(1.0 - ci.a) + ci.rgb;',                 // cirrus sits above cumulus
+    '  L = L*(1.0 - cu.a) + cu.rgb;',
+    /* Real skies never have a clean edge — there is always a few degrees of
+       pale, desaturated aerosol on the join, and it is what tells the eye the
+       ground runs out to a distance rather than stopping. */
+    '  float band = pow(1.0 - clamp(dir.y, 0.0, 1.0), 9.0);',
+    '  L = mix(L, uHorizonCol, band * 0.16 * uHaze);',
+    '  L *= uExposure;',
+    /* A gradient this smooth over this many stops WILL band in 8 bits. One
+       hashed sub-LSB of noise is the whole fix and is invisible in itself. */
+    '  L += (shash21(gl_FragCoord.xy + 0.17) - shash21(gl_FragCoord.xy + 7.31)) * 0.0015;',
+    '  gl_FragColor = vec4(max(L, 0.0), 1.0);',
+    '  #include <tonemapping_fragment>',
+    '  #include <encodings_fragment>',
+    '}'
+  ].join('\n');
+
+  function buildSky() {
+    SU = {
+      uNoise:      { value: makeNoiseTexture() },
+      uSunDir:     { value: new THREE.Vector3() },
+      uBetaR:      { value: new THREE.Vector3() },
+      uBetaM:      { value: new THREE.Vector3() },
+      uFexH:       { value: new THREE.Vector3() },
+      uSunColor:   { value: new THREE.Color(1, 1, 1) },
+      uSkyAmb:     { value: new THREE.Color(0, 0, 0) },
+      uHorizonCol: { value: new THREE.Color(0, 0, 0) },
+      uSunE:       { value: 0 },
+      uMieG:       { value: SKY_P.mieG },
+      uTime:       { value: 0 },
+      uExposure:   { value: SKY_P.exposure },
+      uCoverage:   { value: SKY_P.coverage },
+      uCloudDens:  { value: SKY_P.cloudDens },
+      uCloudH:     { value: SKY_P.cloudH },
+      uCloudScale: { value: SKY_P.cloudScale },
+      uSharp:      { value: SKY_P.sharp },
+      uErode:      { value: SKY_P.erode },
+      uCirrus:     { value: SKY_P.cirrus },
+      uShafts:     { value: SKY_P.shafts },
+      uHaze:       { value: SKY_P.haze },
+      uWind:       { value: new THREE.Vector2() }
+    };
+    var m = new THREE.ShaderMaterial({
+      uniforms: SU, side: THREE.BackSide, depthWrite: false, fog: false,
+      vertexShader: [
+        'varying vec3 vWorld;',
+        'void main(){',
+        '  vWorld = (modelMatrix * vec4(position, 1.0)).xyz;',
+        '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+        '  gl_Position.z = gl_Position.w;',    // pinned to the far plane, any camera.far
+        '}'
+      ].join('\n'),
+      fragmentShader: SKY_FRAG
+    });
+    skyMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), m);
+    skyMesh.scale.setScalar(45000);
+    skyMesh.frustumCulled = false;
+    /* Draw the sky LAST. It and the ground both sit at the origin, so three's
+       front-to-back opaque sort cannot separate them and may shade the whole
+       screen with this shader before the field paints over most of it. Pinning
+       it behind the field lets the depth test reject every sky fragment below
+       the horizon before it ever runs. */
+    skyMesh.renderOrder = 10;
+    sunDir = new THREE.Vector3();
+    updateSun();
+    return skyMesh;
+  }
+
+  /* The zenith radiance of the model itself, evaluated on the CPU. This is
+     exactly what fills a cloud base and a shadow on the ground, so the field
+     and the sky end up lit by the same numbers instead of two guesses. */
+  function skyRadianceJS(dir, out) {
+    var inv = inverseOptical(dir.y);
+    var cosTheta = dir.dot(sunDir);
+    var rPh = 0.05968310365946075 * (1 + cosTheta * cosTheta);
+    var g = SKY_P.mieG, g2 = g * g;
+    var mPh = 0.07957747154594767 * ((1 - g2) / Math.pow(Math.max(1 - 2 * g * cosTheta + g2, 1e-4), 1.5));
+    var c = [0, 0, 0];
+    for (var i = 0; i < 3; i++) {
+      var bR = SU.uBetaR.value.getComponent(i), bM = SU.uBetaM.value.getComponent(i);
+      var Fex = Math.exp(-(bR * RAY_ZEN * inv + bM * MIE_ZEN * inv));
+      var frac = (bR * rPh + bM * mPh) / (bR + bM);
+      var Lin = Math.pow(Math.max(SU.uSunE.value * frac * (1 - Fex), 0), 1.5);
+      var w = Math.min(1, Math.max(0, Math.pow(Math.max(1 - sunDir.y, 0), 5)));
+      Lin *= (1 - w) + w * Math.sqrt(Math.max(SU.uSunE.value * frac * Fex, 0));
+      c[i] = (Lin + 0.1 * Fex) * 0.04;
+    }
+    return out.setRGB(c[0], c[1], c[2]);
+  }
+
+  function updateSun() {
+    if (!SU) return;
+    var phi = (90 - SKY_P.elev) * Math.PI / 180, theta = SKY_P.azim * Math.PI / 180;
+    sunDir.setFromSphericalCoords(1, phi, theta);
+    SU.uSunDir.value.copy(sunDir);
+
+    var zc = Math.max(-1, Math.min(1, sunDir.y));
+    var sunE = SKY_EE * Math.max(0, 1 - Math.exp(-((SKY_CUTOFF - Math.acos(zc)) / SKY_STEEP)));
+    var sunfade = 1 - Math.min(1, Math.max(0, 1 - Math.exp(sunDir.y / 450000)));
+    var rc = SKY_P.rayleigh - (1 - sunfade);
+    var mie = 0.434 * ((0.2 * SKY_P.turbidity) * 10e-18) * SKY_P.mieCoef;
+
+    SU.uSunE.value = sunE;
+    SU.uBetaR.value.set(TOTAL_RAYLEIGH[0] * rc, TOTAL_RAYLEIGH[1] * rc, TOTAL_RAYLEIGH[2] * rc);
+    SU.uBetaM.value.set(MIE_CONST[0] * mie, MIE_CONST[1] * mie, MIE_CONST[2] * mie);
+
+    /* Extinction along the sun ray gives the sun its real colour, and that
+       drives the cloud lighting AND the field's key light. That is the whole
+       point: the sky is the light source, not a backdrop behind one. */
+    var inv = inverseOptical(sunDir.y), fx = [0, 0, 0];
+    for (var i = 0; i < 3; i++) {
+      fx[i] = Math.exp(-(SU.uBetaR.value.getComponent(i) * RAY_ZEN * inv +
+                         SU.uBetaM.value.getComponent(i) * MIE_ZEN * inv));
+    }
+    var mx = Math.max(fx[0], fx[1], fx[2]) || 1;
+    SU.uSunColor.value.setRGB(fx[0] / mx, fx[1] / mx, fx[2] / mx);
+
+    var invH = inverseOptical(0);
+    SU.uFexH.value.set(
+      Math.exp(-(SU.uBetaR.value.x * RAY_ZEN * invH + SU.uBetaM.value.x * MIE_ZEN * invH)),
+      Math.exp(-(SU.uBetaR.value.y * RAY_ZEN * invH + SU.uBetaM.value.y * MIE_ZEN * invH)),
+      Math.exp(-(SU.uBetaR.value.z * RAY_ZEN * invH + SU.uBetaM.value.z * MIE_ZEN * invH)));
+
+    skyRadianceJS(new THREE.Vector3(0, 1, 0), SU.uSkyAmb.value).multiplyScalar(0.62);
+    skyRadianceJS(new THREE.Vector3(-sunDir.x, 0, -sunDir.z).normalize(), SU.uHorizonCol.value);
+  }
+
   /* GLSL every field shader shares. The hashes are Hoskins' — they stay well
      behaved on the large integer cell coordinates a walking camera produces,
      which the usual fract(sin(dot(...))) does not. */
@@ -1230,18 +1605,107 @@
     }
   }
 
+  /* One sun, three consumers.
+
+     Before this, the sky carried its own sun, the grass carried a second one
+     written as a hex string, and the shell's directional light pointed
+     wherever the shell had left it. Three light sources that do not agree is
+     the fault that reads as "the man was pasted in", because the shadow on his
+     face comes from a different sky than the one behind him. The sky's model
+     is the authority — it is the only one that is physics rather than taste —
+     so the field and the key light are both driven from its numbers. */
+  /* Take a colour's HUE and leave its magnitude behind, rescaling so the
+     brightest channel lands on `peak`. Preetham radiance and a display-referred
+     fill are quantities of different kinds, and this is the only honest way to
+     pass one to the other. */
+  function tintOnly(src, peak, out) {
+    var m = Math.max(src.r, src.g, src.b) || 1;
+    return out.setRGB(src.r / m * peak, src.g / m * peak, src.b / m * peak);
+  }
+
+  function matchSunToSky() {
+    if (!SU) return;
+    if (FU) {
+      /* THE SCALES ARE NOT THE SAME. The sky shader carries raw Preetham
+         radiance and divides by uExposure only at the very end; the field's
+         colours are already display-referred. Copying one into the other
+         without that factor is what put a hard white band along the whole
+         horizon — the field was fogging toward a colour some thirty times too
+         bright, so every distance ended in blown paper. */
+      var E = SKY_P.exposure;
+      FU.uSunDir.value.copy(SU.uSunDir.value);
+      /* The sun COLOUR is the exception: Preetham normalises it to a peak of
+         one, so it is a hue and not a radiance. Its strength stays a separate
+         number the field owns. */
+      FU.uSunCol.value.copy(SU.uSunColor.value).multiplyScalar(3.45);
+      FU.uSunTint.value.copy(SU.uSunColor.value);
+      /* The ambient FILL takes the sky's hue at the field's own strength, not
+         the sky's. Handing over the raw radiance cost the field 38% of its
+         luma and dropped the green channel from 83 to 48 — grass lit by direct
+         sun alone, with the sky's contribution nearly gone. Which colour the
+         fill is comes from the sky; how much of it there is belongs to the
+         field, and the two were never the same number. */
+      tintOnly(SU.uSkyAmb.value, 0.567, FU.uSkyCol.value);
+      /* skyBase() — what the field's fog fades INTO — is a two-colour
+         approximation of a dome that is actually full Preetham, and the
+         approximation runs bright. Left at the prototype's weights it put a
+         52-level ridge along the horizon: the far field ended brighter than
+         the sky above it, which reads as a bar of haze laid over the join.
+
+         SEAM is that ridge measured directly off the framebuffer, sky at one
+         row against the field's last row. At 1.0 it is 52 levels; at 0.36 it
+         is 3, which is below what anyone can see on a gradient. */
+      var SEAM = 0.36;
+      FU.uZenith.value.copy(SU.uSkyAmb.value).multiplyScalar(1.9 * E * SEAM);
+      FU.uHorizon.value.copy(SU.uHorizonCol.value).multiplyScalar(1.5 * E * SEAM);
+      FU.uHaze.value.copy(SU.uHorizonCol.value).multiplyScalar(1.25 * E * SEAM);
+    }
+    /* The dog and the handler are Lambert meshes lit by the shell's lights,
+       not by the field's shader, so the only way they sit in the same daylight
+       is for that light to be aimed and tinted from here too. */
+    if (st && st.scene) {
+      var sd = SU.uSunDir.value;
+      st.scene.traverse(function (o) {
+        if (o.isDirectionalLight) {
+          o.position.set(sd.x * 60, sd.y * 60, sd.z * 60);
+          o.color.copy(SU.uSunColor.value);
+        } else if (o.isHemisphereLight) {
+          tintOnly(SU.uSkyAmb.value, 1.0, o.color);   // hue from the sky, level from the shell
+        }
+      });
+      /* The distance fog has to end in the sky's own horizon colour, or the
+         far field dissolves into a grey that is nowhere in the picture. */
+      if (st.scene.fog) st.scene.fog.color.copy(SU.uHorizonCol.value).multiplyScalar(1.5 * SKY_P.exposure);
+      st.scene.background = null;              // the dome is the background now
+    }
+  }
+
   /* The rings and the disc are anchored to the camera, so both have to be told
      where it is every frame. uOrigin is per ring: the camera floored onto that
      ring's OWN cell grid, in cells, which is what keeps the sum exact. */
   function updateField(t) {
-    if (!FU || !st || !st.camera) return;
+    if (!st || !st.camera) return;
     var c = st.camera.position;
-    FU.uTime.value = t;
-    FU.uCamXZ.value.set(c.x, c.z);
-    for (var i = 0; i < grassRings.length; i++) {
-      var cl = grassRings[i].spec.cell;
-      grassRings[i].material.uniforms.uOrigin.value.set(
-        Math.floor(c.x / cl), Math.floor(c.z / cl));
+    if (FU) {
+      FU.uTime.value = t;
+      FU.uCamXZ.value.set(c.x, c.z);
+      for (var i = 0; i < grassRings.length; i++) {
+        var cl = grassRings[i].spec.cell;
+        grassRings[i].material.uniforms.uOrigin.value.set(
+          Math.floor(c.x / cl), Math.floor(c.z / cl));
+      }
+    }
+    if (SU && skyMesh) {
+      SU.uTime.value = t;
+      /* The dome rides with the camera. It is 45 km across, so this changes
+         nothing you could see — but without it a long walk eventually reaches
+         the wall, and the horizon shears. */
+      skyMesh.position.set(c.x, c.y, c.z);
+      /* Drift the deck, slowly. The wind that bends the grass and the wind
+         that moves the cloud are the same weather, so they come off the same
+         direction vector rather than two unrelated constants. */
+      var w = FU ? FU.uWindDir.value : { x: 0.86, y: 0.51 };
+      SU.uWind.value.set(w.x * t * 0.0042, w.y * t * 0.0042);
     }
   }
 
@@ -2650,6 +3114,12 @@
 
     world = new THREE.Group();
     world.add(buildField());
+    /* The sky before the lights: buildSky solves the sun, and matchSunToSky
+       below hands that same direction and colour to the field and to the
+       scene's own key light. One sun, three consumers. */
+    try { world.add(buildSky()); }
+    catch (e) { lastErr = e; skyMesh = null; SU = null; }
+    matchSunToSky();
     /* The generated handler if he arrived, the primitive one if he did not.
        A field with a blocky handler still teaches the drill; a field with no
        handler at all does not, and the line has to hang off something. */
