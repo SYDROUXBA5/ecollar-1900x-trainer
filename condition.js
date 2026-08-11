@@ -749,7 +749,456 @@
   }
 
   var groundMesh = null;
-  function buildField() {
+  /* ─────────────────────────────────────────────────────────────────────────
+     THE FIELD
+
+     Three camera-anchored rings of instanced blades over a polar ground disc.
+     Each instance carries only its integer CELL INDEX; its world cell is
+     aCell + uOrigin, where uOrigin is the camera floored onto that ring's cell
+     grid. That sum is exact in float, so the blades are pinned to the world
+     while the buffer stays pinned to the camera: the handler can walk forever
+     and pay for a fixed 206k blades, and no blade ever moves under him.
+
+     Storing world positions in the buffer instead looks right until you walk —
+     re-anchoring shifts every instance by one cell at once and the whole field
+     slides several centimetres, many times a second.
+
+     RELIEF IS PINNED TO ZERO HERE. The shaders carry a terrainH() and the
+     prototype rolls the ground by a hand's depth, which is most of what bends
+     the horizon. But this drill puts a dog, a handler and a leash on that
+     ground at heights computed against y = 0, and a rolling field would float
+     the paws and hang the line in mid-air. Ground truth beats a nicer skyline.
+     Turning it on means giving terrainH a JavaScript twin and placing both
+     bodies on it — a separate change, not a free one. */
+  /* GLSL every field shader shares. The hashes are Hoskins' — they stay well
+     behaved on the large integer cell coordinates a walking camera produces,
+     which the usual fract(sin(dot(...))) does not. */
+  var GLSL_COMMON = [
+    'float hash21(vec2 p){',
+    '  vec3 q = fract(vec3(p.xyx) * 0.1031);',
+    '  q += dot(q, q.yzx + 33.33);',
+    '  return fract((q.x + q.y) * q.z);',
+    '}',
+    'vec2 hash22(vec2 p){',
+    '  vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));',
+    '  q += dot(q, q.yzx + 33.33);',
+    '  return fract((q.xx + q.yz) * q.zy);',
+    '}',
+    'float vnoise(vec2 p){',
+    '  vec2 i = floor(p), f = fract(p);',
+    '  f = f * f * (3.0 - 2.0 * f);',
+    '  return mix(mix(hash21(i),                hash21(i + vec2(1.0, 0.0)), f.x),',
+    '             mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x), f.y);',
+    '}',
+    'uniform float uRelief;',
+    'float terrainH(vec2 p){',
+    '  float h = vnoise(p * 0.108) * 0.64 + vnoise(p * 0.33) * 0.26 + vnoise(p * 0.95) * 0.10;',
+    '  return (h - 0.5) * uRelief;',
+    '}',
+    /* One sky function, used by the fog as well as the dome. Distance does not
+       fade to a constant grey — it fades to the exact colour of the sky in that
+       direction, which is why the far field dissolves instead of ending. */
+    'uniform vec3 uZenith, uHorizon, uHaze, uSunTint, uSunDir;',
+    'vec3 skyBase(vec3 dir){',
+    '  float h = clamp(dir.y, 0.0, 1.0);',
+    '  vec3 c = mix(uHorizon, uZenith, pow(h, 0.42));',
+    '  c = mix(c, uHaze, exp(-h * 7.5) * 0.62);',
+    '  return c + uSunTint * pow(max(dot(dir, uSunDir), 0.0), 5.0) * 0.28;',
+    '}',
+    'uniform float uFogStart, uFogDens;',
+    'vec3 applyFog(vec3 col, vec3 wpos){',
+    '  vec3 d = wpos - cameraPosition;',
+    '  float dist = length(d);',
+    '  float f = 1.0 - exp(-pow(max(dist - uFogStart, 0.0) * uFogDens, 1.4));',
+    '  return mix(col, skyBase(normalize(d)), clamp(f, 0.0, 1.0));',
+    '}'
+  ].join('\n');
+
+  var GRASS_VERT = GLSL_COMMON + [
+    'attribute vec2 aCell;',
+    'uniform vec2  uOrigin;',
+    'uniform vec2  uCamXZ, uWindDir;',
+    'uniform float uCell, uTime, uHeight, uWind, uWidth;',
+    'uniform float uRadius, uFadeStart, uInner, uInnerBand;',
+    'uniform vec3  uGrassA, uGrassB, uGrassTip, uSeedCol;',
+    'varying vec3 vCol, vN, vW;',
+    'varying float vT, vShade;',
+    'vec3 rotAxis(vec3 v, vec3 k, float a){',
+    '  float c = cos(a), s = sin(a);',
+    '  return v * c + cross(k, v) * s + k * dot(k, v) * (1.0 - c);',
+    '}',
+    'void main(){',
+    /* aCell and uOrigin are both integers, so this sum is exact in float and
+       the hashes below never flicker as the handler walks. */
+    '  vec2 gid = aCell + uOrigin;',
+    '  vec2 rj  = hash22(gid);',
+    '  vec2 rk  = hash22(gid + 71.3);',
+    '  float rh = rk.x, ra = rk.y, rc = hash21(gid + 19.7);',
+    '  vec2 wxz = (gid + (rj - 0.5) * 1.3) * uCell;',
+    '  float dist = length(wxz - uCamXZ);',
+    /* Fade out by COLLAPSING the blade, not by going transparent: a zero-height
+       blade is a degenerate triangle the rasteriser throws away — no sorting,
+       no blend, and it cannot pop. The same trick guards the inner hole. */
+    '  float live = (1.0 - smoothstep(uFadeStart, uRadius, dist))',
+    '             * smoothstep(uInner, uInner + uInnerBand, dist);',
+    '  float t = position.y, side = position.x;',
+    /* Height has to spread AND clump. All blades within 20% of one height is a
+       haircut; tall ones scattered independently is a lawn with weeds. Real
+       turf grows in tufts, so a half-metre noise decides how well the grass is
+       doing in each spot and the per-blade random spreads it around that. The
+       gaps this opens matter as much as the clumps — they read as depth. */
+    '  float tuft = vnoise(wxz * 1.7);',
+    '  float h = uHeight * (0.30 + 1.30 * rh * rh) * (0.45 + 1.05 * tuft) * live;',
+    /* One blade in twelve is a seed stalk: half again as tall, under half as
+       wide, arching further. One hash, no extra geometry, and it is what breaks
+       the flat top edge — one species reads as carpet however dense it gets. */
+    '  float seed = step(0.915, hash21(gid + 3.7));',
+    '  h *= mix(1.0, 1.7, seed);',
+    /* A blade thinner than a pixel is a shimmering dotted line, so hold a width
+       floor that grows with distance. It is the whole reason the far ring is
+       quiet instead of crawling. */
+    '  float w = max(uWidth * (0.72 + 0.6 * rh) * mix(1.0, 0.42, seed), dist * 0.0011);',
+    '  float taper = pow(max(1.0 - t, 0.0), 0.55);',
+    /* Each blade droops its own way BEFORE any wind. Without this every blade
+       lies at its neighbour's angle and the field reads as a combed crop. */
+    '  float arc = (0.10 + 0.95 * rj.y * rj.y) * h * mix(1.0, 1.7, seed);',
+    '  vec3 p = vec3(side * w * taper, h * t, arc * t * t);',
+    /* Normal of y = h.t, z = k.t^2, fanned across the width so a flat ribbon
+       shades like a round blade. Without the fan the field goes to plastic. */
+    '  vec3 n = normalize(vec3(0.0, -2.0 * arc * t, h));',
+    '  n = normalize(n + vec3(side * 0.62, 0.0, 0.0));',
+    '  float ca = cos(ra * 6.2831853), sa = sin(ra * 6.2831853);',
+    '  p = vec3(p.x * ca + p.z * sa, p.y, -p.x * sa + p.z * ca);',
+    '  n = vec3(n.x * ca + n.z * sa, n.y, -n.x * sa + n.z * ca);',
+    /* Wind: two long waves crossing at different speeds and angles, so gusts
+       arrive and sweep instead of the field breathing in time. The per-blade
+       flutter on top is what stops it looking like cloth. */
+    '  float g1 = sin(dot(wxz, vec2(0.115, 0.062)) * 6.2831853 - uTime * 0.85);',
+    '  float g2 = sin(dot(wxz, vec2(-0.043, 0.088)) * 6.2831853 - uTime * 0.52 + 2.1);',
+    '  float gust = (0.52 + 0.48 * g1) * (0.62 + 0.38 * g2);',
+    '  float flut = sin(uTime * 4.6 + rh * 42.0 + wxz.x * 1.7) * 0.13;',
+    '  float ang = uWind * (0.18 + gust + flut) * (0.55 + 0.85 * rh) * pow(t, 1.35);',
+    /* Gusts are not parallel. Turning each blade off the wind axis puts swirl
+       in the sweep, which is the difference between grass and a flag. */
+    '  float aw = (rc - 0.5) * 0.7;',
+    '  vec2 wd = vec2(uWindDir.x * cos(aw) - uWindDir.y * sin(aw),',
+    '                 uWindDir.x * sin(aw) + uWindDir.y * cos(aw));',
+    '  vec3 axis = vec3(-wd.y, 0.0, wd.x);',
+    '  p = rotAxis(p, axis, ang);',
+    '  n = rotAxis(n, axis, ang);',
+    '  vec3 world = vec3(wxz.x, terrainH(wxz), wxz.y) + p;',
+    /* Colour. Two scales of patchiness decide dry vs green, per-blade value
+       spreads it, the tip lifts. The base is crushed hard: the dark down in the
+       sward is most of what tells the eye this is depth and not a painted plane. */
+    '  float m1 = vnoise(wxz * 0.085), m2 = vnoise(wxz * 0.44);',
+    /* The tuft field drives colour as well as height, which is what happens in
+       a real field — where grass does well it is lush and dark, and the thin
+       patches between are the bleached ones. One noise driving both is what
+       makes the variation read as one field. */
+    '  float dry = clamp(m1 * 1.15 + m2 * 0.55 + (1.0 - tuft) * 0.75 - 0.62, 0.0, 1.0);',
+    '  vec3 base = mix(uGrassA, uGrassB, dry);',
+    '  base *= 0.62 + 0.78 * rc;',
+    '  base = mix(base, uGrassTip, pow(t, 1.6) * (0.30 + 0.5 * rc));',
+    '  base = mix(base, uSeedCol, seed * pow(t, 2.2) * 0.85);',
+    /* Deeper in a thick tuft means less sky reaches the base, and a SHORT blade
+       inside a tall clump is buried under its neighbours. This is the cheapest
+       stand-in for blade-on-blade shadowing there is, and without it a dense
+       field lights up uniformly and goes back to one green sheet. */
+    /* Occlusion scales with how deep the sward IS. The prototype's numbers were
+       set against 29 cm grass, where a blade's base really is buried; at the
+       10 cm this field is mown to there is barely a well for light to fall
+       into, and the same crush turned the foreground almost black. */
+    '  float ao = mix(0.54 - 0.13 * tuft, 1.0, smoothstep(0.0, 0.48, t)) * mix(0.86, 1.06, m2);',
+    '  ao *= mix(1.0, 0.74, tuft * (1.0 - rh));',
+    '  vCol = base * ao;',
+    /* Cloud shadow: one low-frequency field drifting across. The features are
+       tens of metres wide, so per-blade is already smooth. */
+    '  float cl = vnoise(wxz * 0.026 + vec2(uTime * 0.011, uTime * 0.007));',
+    '  vShade = mix(0.42, 1.0, smoothstep(0.34, 0.66, cl));',
+    '  vShade *= 0.80 + 0.20 * vnoise(wxz * 0.75);',
+    '  vT = t; vN = n; vW = world;',
+    '  gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);',
+    '}'
+  ].join('\n');
+
+  var GRASS_FRAG = GLSL_COMMON + [
+    'uniform vec3 uSunCol, uSkyCol, uBounce, uGrassTip;',
+    'varying vec3 vCol, vN, vW;',
+    'varying float vT, vShade;',
+    'void main(){',
+    '  vec3 N = normalize(vN);',
+    '  if(!gl_FrontFacing) N = -N;',
+    '  vec3 V = normalize(cameraPosition - vW);',
+    '  vec3 L = uSunDir;',
+    '  float ndl = dot(N, L);',
+    /* Half-lambert mixed back toward true lambert. A blade lit purely by
+       max(N.L, 0) goes flat black on its shadow side, which real grass never
+       does — light bounces around inside a sward. */
+    '  float wrap = clamp(ndl * 0.5 + 0.5, 0.0, 1.0);',
+    '  float sun = mix(wrap * wrap, max(ndl, 0.0), 0.72) * vShade;',
+    '  vec3 amb = mix(uBounce, uSkyCol, N.y * 0.5 + 0.5);',
+    /* Subsurface: light entering the far face and coming out toward the eye.
+       This is why backlit grass glows, and the strongest single cue that these
+       are thin translucent things and not painted cards. Gating on (1 - sun)
+       keeps the glow on the shadow side instead of brightening everything. */
+    '  float back = pow(max(dot(-L, V), 0.0), 3.2);',
+    '  vec3 trans = uSunCol * mix(vCol, uGrassTip, 0.5) * back',
+    '             * (0.12 + 0.88 * vT) * (0.35 + 0.65 * (1.0 - sun)) * vShade * 1.35;',
+    /* Broad and weak. A tight specular picks out whichever blades face the sun
+       and blows them to white pinpricks — the field ends up looking littered. */
+    '  vec3 H = normalize(L + V);',
+    '  float spec = pow(max(dot(N, H), 0.0), 20.0) * 0.11 * vShade * smoothstep(0.15, 0.95, vT);',
+    '  vec3 col = vCol * (amb + uSunCol * sun) + trans + uSunCol * spec;',
+    '  col = applyFog(col, vW);',
+    '  gl_FragColor = vec4(col, 1.0);',
+    '  #include <tonemapping_fragment>',
+    '  #include <encodings_fragment>',
+    '}'
+  ].join('\n');
+
+  /* Everything that does not vary per pixel is computed per VERTEX. The disc
+     has 15k vertices and the screen has millions of fragments, so the terrain
+     normal, the patchiness, the blend mask and the cloud shadow all move up
+     here — all low-frequency fields sampled on quads six centimetres wide at
+     your feet, so nothing is lost and the fragment shader drops from sixteen
+     noise evaluations to none. */
+  var GROUND_VERT = GLSL_COMMON + [
+    'uniform vec2 uCamXZ;',
+    'uniform float uTime;',
+    'uniform vec3 uGrassA, uGrassB;',
+    'varying vec3 vW, vN, vTint;',
+    'varying float vShade, vMask;',
+    'void main(){',
+    '  vec2 w = position.xz + uCamXZ;',
+    '  vW = vec3(w.x, terrainH(w), w.y);',
+    '  float e = 0.35;',
+    '  vN = normalize(vec3(terrainH(w - vec2(e, 0.0)) - terrainH(w + vec2(e, 0.0)),',
+    '                      2.0 * e,',
+    '                      terrainH(w - vec2(0.0, e)) - terrainH(w + vec2(0.0, e))));',
+    /* The same patchiness the blades use, so the moment the last blade
+       collapses the ground under it is already exactly the right colour. */
+    '  float m1 = vnoise(w * 0.085), m2 = vnoise(w * 0.44);',
+    '  float dry = clamp(m1 * 0.95 + m2 * 0.35 - 0.22, 0.0, 1.0);',
+    '  vTint = mix(uGrassA, uGrassB, dry) * 3.1;',
+    '  vMask = smoothstep(0.34, 0.66, vnoise(w * 0.055));',
+    '  vShade = mix(0.42, 1.0, smoothstep(0.34, 0.66,',
+    '          vnoise(w * 0.026 + vec2(uTime * 0.011, uTime * 0.007))));',
+    '  gl_Position = projectionMatrix * viewMatrix * vec4(vW, 1.0);',
+    '}'
+  ].join('\n');
+
+  var GROUND_FRAG = GLSL_COMMON + [
+    'uniform sampler2D uGround;',
+    'uniform vec3 uSunCol, uSkyCol, uBounce;',
+    'varying vec3 vW, vN, vTint;',
+    'varying float vShade, vMask;',
+    'void main(){',
+    '  vec2 w = vW.xz;',
+    /* The old field tiled one photo 22x22 and you could read the grid straight
+       off it. Two samples at different scales, one rotated 40 degrees, chosen
+       between by a mask eighteen metres across: no scale is ever repeated
+       against itself, so there is no grid left to see. */
+    '  vec3 t1 = texture2D(uGround, w * 0.312).rgb;',
+    '  mat2 rot = mat2(0.766, -0.643, 0.643, 0.766);',
+    '  vec3 t2 = texture2D(uGround, rot * w * 0.077 + 0.37).rgb;',
+    '  vec3 alb = mix(t1, t2, vMask);',
+    '  alb = alb * alb * mix(vec3(1.0), vTint, 0.55);',
+    '  vec3 N = normalize(vN);',
+    '  vec3 V = normalize(cameraPosition - vW);',
+    '  float sun = max(dot(N, uSunDir), 0.0) * vShade;',
+    '  vec3 amb = mix(uBounce, uSkyCol, N.y * 0.5 + 0.5);',
+    /* Grazing light scattering off the top of a sward. It is why a field goes
+       pale toward the horizon on a bright day, and it lands exactly where the
+       blades have stopped and the ground carries the look alone. */
+    '  float graze = pow(1.0 - max(dot(N, V), 0.0), 4.0) * 0.35;',
+    /* Under the near blades this is a sward FLOOR, not a lawn seen from above:
+       it sits in the shade of everything standing on it. Crushing it there is
+       what stops the blades reading as cut-outs on a bright sheet — and it must
+       finish lifting only AFTER the last blade has gone, or a dark band appears
+       across the field at the hand-over. */
+    /* Same correction as the blades' AO: a shallow sward casts a shallow floor
+       shadow. Crushing the ground to 0.40 under 10 cm grass put a dark disc
+       around the handler's feet and then a bright band where the blades ran
+       out, which read as two different fields joined at a seam. */
+    '  float sward = mix(0.72, 1.0, smoothstep(6.0, 34.0, length(vW - cameraPosition)));',
+    '  vec3 col = alb * (amb + uSunCol * sun * 0.80) * 0.86 * sward;',
+    '  col += uSunCol * graze * vShade * max(dot(-uSunDir, V), 0.0) * 0.5;',
+    '  col = applyFog(col, vW);',
+    '  gl_FragColor = vec4(col, 1.0);',
+    '  #include <tonemapping_fragment>',
+    '  #include <encodings_fragment>',
+    '}'
+  ].join('\n');
+
+  var RINGS = [
+    { cell: 0.042, rIn: 0.0,  rOut: 7.6,  fade: 5.4,  band: 0.1, segs: 4, wMul: 1.0, hMul: 1.00, n: 68000 },
+    { cell: 0.085, rIn: 5.0,  rOut: 16.5, fade: 11.0, band: 2.6, segs: 3, wMul: 1.9, hMul: 1.10, n: 72000 },
+    { cell: 0.160, rIn: 11.0, rOut: 31.0, fade: 21.0, band: 5.0, segs: 1, wMul: 3.4, hMul: 1.28, n: 66000 }
+  ];
+  var FIELD_C = { bladeW: 0.0072, bladeH: 0.105, discR: 250, discRings: 150, discSectors: 100 };
+  var grassRings = [], groundDiscMesh = null, FU = null;
+
+  function lin(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
+
+  function fieldUniforms() {
+    return {
+      uTime:     { value: 0 },
+      uCamXZ:    { value: new THREE.Vector2() },
+      uSunDir:   { value: new THREE.Vector3(0.42, 0.39, 0.82).normalize() },
+      uSunCol:   { value: lin('#ffeccb').multiplyScalar(3.45) },
+      /* Sky fill down, sun up. Same overall exposure, but the RATIO between
+         them is what the eye reads as contrast, and a field lit mostly by
+         ambient has none. */
+      uSkyCol:   { value: lin('#9dbfe4').multiplyScalar(0.72) },
+      uBounce:   { value: lin('#6d6444').multiplyScalar(0.42) },
+      uZenith:   { value: lin('#3f74b6') },
+      uHorizon:  { value: lin('#93a9ba') },
+      /* Haze toward a desaturated blue-green, not toward paper. A near-white
+         haze turns everything past twenty metres into a blank wall and takes
+         the field's colour with it. */
+      uHaze:     { value: lin('#9fae9e') },
+      uSunTint:  { value: lin('#ffcf8e') },
+      uWindDir:  { value: new THREE.Vector2(0.86, 0.51) },
+      uRelief:   { value: 0.0 },          // see the note above
+      uFogStart: { value: 13.0 },
+      uFogDens:  { value: 0.0115 },
+      uGrassA:   { value: lin('#3f5a26') },   // cool shadowed green
+      uGrassB:   { value: lin('#7d8b38') },   // sun-bleached / dry
+      uGrassTip: { value: lin('#a3b05c') },
+      uSeedCol:  { value: lin('#b9a262') },   // straw, at a seed head
+      uGround:   { value: null }
+    };
+  }
+
+  /* position.x carries the side (-1 | +1), position.y the height fraction.
+     Nothing else — the blade's shape is decided per blade in the shader. */
+  function bladeTemplate(segs) {
+    var pos = [], idx = [], i;
+    for (i = 0; i < segs; i++) { var t = i / segs; pos.push(-1, t, 0, 1, t, 0); }
+    pos.push(0, 1, 0);                                     // the tip, one vertex
+    for (i = 0; i < segs - 1; i++) {
+      var a = i * 2;
+      idx.push(a, a + 1, a + 3, a, a + 3, a + 2);
+    }
+    var la = (segs - 1) * 2;
+    idx.push(la, la + 1, segs * 2);
+    return { pos: new Float32Array(pos), idx: idx };
+  }
+
+  /* Every cell of an annulus, shuffled, so drawing the first n instances takes
+     a uniform random n of the ring instead of eating it from one edge. */
+  function cellRing(cell, rIn, rOut) {
+    var half = Math.ceil(rOut / cell), out = [], ix, iz;
+    for (ix = -half; ix <= half; ix++) {
+      for (iz = -half; iz <= half; iz++) {
+        var x = ix * cell, z = iz * cell, d = Math.sqrt(x * x + z * z);
+        if (d < rIn || d > rOut) continue;
+        out.push(ix, iz);
+      }
+    }
+    var n = out.length / 2;
+    for (var i = n - 1; i > 0; i--) {                      // Fisher-Yates, on pairs
+      var j = (Math.random() * (i + 1)) | 0;
+      var ax = out[i * 2], az = out[i * 2 + 1];
+      out[i * 2] = out[j * 2]; out[i * 2 + 1] = out[j * 2 + 1];
+      out[j * 2] = ax; out[j * 2 + 1] = az;
+    }
+    return { data: new Float32Array(out), count: n };
+  }
+
+  /* 206k blades was measured at 8 ms on a 0.61 megapixel canvas. That is the
+     only surface this could be measured on — the verification pane is a fixed
+     letterbox — and a full retina window is several times the fragment load on
+     hardware I cannot see. So the count is not a constant: it is spent against
+     whatever surface the machine actually has, which costs nothing to compute
+     and means a small laptop thins the field instead of dropping frames.
+
+     The floor is deliberately high. Below about half density the ground starts
+     showing through and the field stops reading as turf, at which point a
+     smooth frame rate has bought a worse-looking field, which is not a trade
+     worth making. */
+  function bladeBudget() {
+    try {
+      var cv = st && st.el && st.el.querySelector('canvas');
+      if (!cv) return 1;
+      var mp = (cv.width * cv.height) / 1e6;
+      if (!(mp > 0.05)) return 1;                 // not laid out yet: assume full
+      return clamp(0.85 / mp, 0.5, 1.0);
+    } catch (e) { return 1; }
+  }
+
+  function buildRing(opt) {
+    var tpl = bladeTemplate(opt.segs);
+    var ring = cellRing(opt.cell, opt.rIn, opt.rOut);
+    var g = new THREE.InstancedBufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(tpl.pos, 3));
+    g.setAttribute('aCell', new THREE.InstancedBufferAttribute(ring.data, 2));
+    g.setIndex(tpl.idx);
+    g.instanceCount = Math.min(Math.round(opt.n * bladeBudget()), ring.count);
+    /* The template is two centimetres tall, so three.js would compute a
+       two-centimetre bounding sphere and cull the whole ring the moment the
+       camera looked away from the origin. The offsets live in the shader,
+       where the bounds pass cannot see them. */
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), opt.rOut * 2);
+
+    var uni = Object.assign({
+      uCell:      { value: opt.cell },
+      uOrigin:    { value: new THREE.Vector2() },
+      uWidth:     { value: FIELD_C.bladeW * opt.wMul },
+      uRadius:    { value: opt.rOut },
+      uFadeStart: { value: opt.fade },
+      uInner:     { value: opt.rIn > 0 ? opt.rIn : -2.0 },
+      uInnerBand: { value: opt.band },
+      uWind:      { value: 0.52 },
+      /* The prototype stood at 0.29 m, which is a hay meadow. On a training
+         field that is not just wrong, it is disabling: it swallowed the dog to
+         the chest, and a drill about where her feet are and whether the line is
+         tight cannot hide either one in the sward. Mown working grass. */
+      uHeight:    { value: FIELD_C.bladeH * opt.hMul }
+    }, FU);
+
+    var mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({
+      vertexShader: GRASS_VERT, fragmentShader: GRASS_FRAG,
+      side: THREE.DoubleSide, dithering: true, uniforms: uni
+    }));
+    mesh.frustumCulled = false;
+    mesh.spec = opt;
+    return mesh;
+  }
+
+  /* Rings spaced geometrically: six centimetres at your feet, tens of metres at
+     the horizon, 15k vertices for 250 m of field. A square plane fine enough
+     for the detail underfoot would need millions. */
+  function groundDisc() {
+    var R = FIELD_C.discRings, Sc = FIELD_C.discSectors, LB = 4.93;
+    var A = FIELD_C.discR / (Math.exp(LB) - 1);
+    var pos = new Float32Array((R + 1) * (Sc + 1) * 3), idx = [], k = 0, i, j;
+    for (i = 0; i <= R; i++) {
+      var r = A * (Math.exp(LB * i / R) - 1.0);
+      for (j = 0; j <= Sc; j++) {
+        var a = j / Sc * Math.PI * 2;
+        pos[k++] = Math.cos(a) * r; pos[k++] = 0; pos[k++] = Math.sin(a) * r;
+      }
+    }
+    for (i = 0; i < R; i++) {
+      for (j = 0; j < Sc; j++) {
+        var v0 = i * (Sc + 1) + j, v1 = v0 + 1, v2 = v0 + Sc + 1, v3 = v2 + 1;
+        /* Wind these so the normal points UP. Radial-then-tangential gives a
+           face pointing at the floor, which a FrontSide material culls. */
+        idx.push(v0, v1, v2, v1, v3, v2);
+      }
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setIndex(idx);
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), FIELD_C.discR * 1.2);
+    return g;
+  }
+
+  /* If any of this fails to compile on the student's machine, the drill must
+     still run. The old textured plane stays in the file as the fallback and
+     the field quietly becomes what it was yesterday. */
+  function buildFlatField() {
     var g = new THREE.Group();
     groundMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(120, 120),
@@ -757,6 +1206,43 @@
     groundMesh.rotation.x = -Math.PI / 2;
     g.add(groundMesh);
     return g;
+  }
+
+  function buildField() {
+    var g = new THREE.Group();
+    try {
+      FU = fieldUniforms();
+      groundDiscMesh = new THREE.Mesh(groundDisc(), new THREE.ShaderMaterial({
+        vertexShader: GROUND_VERT, fragmentShader: GROUND_FRAG,
+        dithering: true, uniforms: FU
+      }));
+      groundDiscMesh.frustumCulled = false;
+      groundDiscMesh.renderOrder = -1;              // fill depth before the blades
+      g.add(groundDiscMesh);
+
+      grassRings = RINGS.map(buildRing);
+      grassRings.forEach(function (m) { g.add(m); });
+      return g;
+    } catch (e) {
+      lastErr = e;
+      grassRings = []; groundDiscMesh = null; FU = null;
+      return buildFlatField();
+    }
+  }
+
+  /* The rings and the disc are anchored to the camera, so both have to be told
+     where it is every frame. uOrigin is per ring: the camera floored onto that
+     ring's OWN cell grid, in cells, which is what keeps the sum exact. */
+  function updateField(t) {
+    if (!FU || !st || !st.camera) return;
+    var c = st.camera.position;
+    FU.uTime.value = t;
+    FU.uCamXZ.value.set(c.x, c.z);
+    for (var i = 0; i < grassRings.length; i++) {
+      var cl = grassRings[i].spec.cell;
+      grassRings[i].material.uniforms.uOrigin.value.set(
+        Math.floor(c.x / cl), Math.floor(c.z / cl));
+    }
   }
 
   /* The photographed turf, swapped in over the drawn stripes once it decodes.
@@ -784,28 +1270,31 @@
     texOnce['catch'](function () { texOnce = null; });
     return texOnce;
   }
+  /* The photographed turf. It is no longer the field — the blades are — but it
+     is still the ground BENEATH them, which is what shows through the sward and
+     carries the last two hundred metres to the horizon. The shader samples it
+     at two scales, so the tiling that used to be readable as a plaid is gone
+     and the repeat below only has to be seamless, not large. */
   function upgradeGrass() {
     loadFieldTex().then(function (T) {
-      if (!T.grass || !groundMesh || dead) return;
+      if (!T.grass || dead) return;
       new THREE.TextureLoader().load(T.grass, function (tex) {
-        if (!groundMesh || dead) return;
+        if (dead) return;
         tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-        /* One tile is about 5.5 m of grass. Much tighter and the repeat
-           becomes a visible plaid; much looser and there is nothing passing
-           the camera to tell the student they are moving. */
-        tex.repeat.set(22, 22);
         tex.anisotropy = 8;
+        if (FU) { FU.uGround.value = tex; return; }
+        if (!groundMesh) return;                      // the flat fallback
+        tex.repeat.set(22, 22);
         var old = groundMesh.material.map;
         groundMesh.material.map = tex;
-        /* Tint it DOWN. The drawn stripes were already written dark because a
-           Lambert map is multiplied by a scene lit for a studio; a photograph
-           dropped in at full value comes back pale yellow-sage and nothing
-           like the turf it was generated from. */
+        /* Tint it DOWN. A Lambert map is multiplied by a scene lit for a
+           studio, so a photograph dropped in at full value comes back pale
+           yellow-sage and nothing like the turf it came from. */
         groundMesh.material.color = new THREE.Color(K.grassTint);
         groundMesh.material.needsUpdate = true;
         if (old && old.dispose) old.dispose();
-      }, undefined, function () { /* keep the drawn stripes */ });
-    })['catch'](function () { /* keep the drawn stripes */ });
+      }, undefined, function () { /* keep what is already there */ });
+    })['catch'](function () { /* keep what is already there */ });
   }
 
   function shadowDisc(r) {
@@ -1794,6 +2283,10 @@
     }
     stepScene(s);
     stepCamera(s);
+    /* After stepCamera, never before: the grass rings and the ground disc are
+       anchored to where the camera IS this frame, and feeding them last
+       frame's position drags the whole field a step behind the view. */
+    updateField(G.t);
 
     // the HUD is not a 60 Hz surface; 12 Hz is past the point anyone can tell
     if (G.t - lastPaint > 0.08) { lastPaint = G.t; paintLive(); }
@@ -2376,6 +2869,11 @@
       st.camera.lookAt(tx, ty, tz);
       st.controls.target.set(tx, ty, tz);
     },
+    /* The two rigs themselves. A gait fault is a claim about where a limb is
+       at a given instant, and that is a number, not something to be squinted
+       at in a screenshot — which is exactly how a wrong one got believed. */
+    rigs: function () { return { man: handlerObj, dog: dogRoot, st: st }; },
+
     /* Where the line's two ends actually are, in the world and on the screen.
        "The leash looks like it joins her at the wrong end" is not answerable
        from a screenshot — the dog's own body occludes half the line — so it
