@@ -53,36 +53,36 @@ footer{margin-top:34px;font-size:12.5px;color:var(--mute);text-align:center}
 <header>
   <p class="kicker">Highland Canine Training · Dogtra 1900X</p>
   <h1>Build in progress</h1>
-  <p class="head">All four pieces built. Sky and grass are in blind A/B against the bar right now.</p>
-  <p class="note">Builders delivered a vendored Preetham sky with a cloud deck and aerial perspective, 206,000 instanced grass blades on three LOD rings, a 26-bone trainer rebuilt from the scan with the fused trousers cut and a foot-planted walk, and a dog rebuilt on world-anchored footfalls. The sky and grass pairs were shuffled on disk before any critic saw them; the key is sealed. One builder measurement contradicts something I told Remi earlier — see the log.</p>
+  <p class="head">Every piece goes back. Two of the four bars were broken, and that was my fault.</p>
+  <p class="note">The critics were right to be suspicious: both said our side &#x27;wins by default rather than on merit&#x27;. They were correct. The daytime sky reference I captured was blown out to a near-white frame spanning RGB 224-255, and the grass reference was three.js&#x27;s instancing-scatter demo, which scatters coloured shapes on a blob and is not grass at all — I chose it from a filename search without looking at it. Those two verdicts are void. The critiques of OUR OWN work stand and are specific, and not one of the four pieces was judged shippable.</p>
   <div class="bar"><i></i></div>
-  <p class="meta">0 of 4 pieces have beaten the bar · updated round 1 built; critics judging blind · this page refreshes itself every 20s</p>
+  <p class="meta">0 of 4 pieces have beaten the bar · updated round 1 judged — 0 of 4 shippable, and two comparisons were void · this page refreshes itself every 20s</p>
 </header>
 
 <h2>Pieces</h2>
-<ul><li class="p j">
-      <div class="ph"><h3>Sky</h3><span class="pill j">Critic judging</span></div>
-      <p class="sub">bar: threejs.org/examples/webgl_shaders_sky.html <span class="rnd">round 1</span></p>
-      <p class="gap"><b>Biggest remaining gap:</b> Currently a flat background colour and linear fog. No sun, no scattering, no gradient.</p>
-    </li><li class="p j">
-      <div class="ph"><h3>Grass</h3><span class="pill j">Critic judging</span></div>
-      <p class="sub">bar: three.js instanced-grass examples <span class="rnd">round 1</span></p>
-      <p class="gap"><b>Biggest remaining gap:</b> Currently one tiled photo on a flat plane. No blades, no depth, no wind, and it tiles visibly.</p>
-    </li><li class="p j">
-      <div class="ph"><h3>The trainer</h3><span class="pill j">Critic judging</span></div>
-      <p class="sub">look and movement — must read as a real man <span class="rnd">round 1</span></p>
-      <p class="gap"><b>Biggest remaining gap:</b> Unrigged photogrammetry scan, hand-rigged: fused thighs, no elbow, no shoulder. Mixamo needs a login an agent cannot do — a rigged humanoid that works offline has to be found.</p>
-    </li><li class="p j">
-      <div class="ph"><h3>Dog locomotion</h3><span class="pill j">Critic judging</span></div>
-      <p class="sub">direction: real gait, judged against Muybridge <span class="rnd">round 1</span></p>
-      <p class="gap"><b>Biggest remaining gap:</b> Ground-locked walk/trot with a spine bend is in. No acceleration lean, no head bob, no foot IK, paws do not conform to the ground.</p>
+<ul><li class="p r">
+      <div class="ph"><h3>Sky</h3><span class="pill r">Back to builder</span></div>
+      <p class="sub">bar: threejs.org/examples/webgl_shaders_sky.html <span class="rnd">round 2</span></p>
+      <p class="crit"><b>Critic:</b> Not shippable. Back to the builder.</p><p class="gap"><b>Biggest remaining gap:</b> Cloud opacity is binary — edges cut from opaque to transparent in 1-3 px with stair-stepping, and no cloud self-shadows. No silver lining anywhere near the sun. Reads as painted decals on a gradient dome.</p>
+    </li><li class="p r">
+      <div class="ph"><h3>Grass</h3><span class="pill r">Back to builder</span></div>
+      <p class="sub">bar: three.js instanced-grass examples <span class="rnd">round 2</span></p>
+      <p class="crit"><b>Critic:</b> Not shippable. Back to the builder.</p><p class="gap"><b>Biggest remaining gap:</b> Density inverts with distance: the mat opens into separated tufts on bare soil through the middle band, then closes again at the horizon. Real grass hides the ground MORE as it recedes. Also a monoculture — one species, one height, one hue.</p>
+    </li><li class="p r">
+      <div class="ph"><h3>The trainer</h3><span class="pill r">Back to builder</span></div>
+      <p class="sub">look and movement — must read as a real man <span class="rnd">round 2</span></p>
+      <p class="crit"><b>Critic:</b> Not shippable. Back to the builder.</p><p class="gap"><b>Biggest remaining gap:</b> Arms swing on the SAME side as the legs. Human gait is strictly contralateral, and this is the error a lay viewer feels instantly as &#x27;marching mannequin&#x27;. Also the trailing foot dangles fully pointed on a straight knee, which happens at no point in a real gait cycle.</p>
+    </li><li class="p r">
+      <div class="ph"><h3>Dog locomotion</h3><span class="pill r">Back to builder</span></div>
+      <p class="sub">direction: real gait, judged against Muybridge <span class="rnd">round 2</span></p>
+      <p class="crit"><b>Critic:</b> Not shippable. Back to the builder.</p><p class="gap"><b>Biggest remaining gap:</b> The pose is a show-stack, not an instant of a real gait: near-side fore and hind both protracted at once, which is a pace fragment rather than the lateral-sequence walk it claims.</p>
     </li></ul>
 
 <h2>Hard gates</h2>
-<ul><li class="g q"><span class="gm">·</span>Holds 60fps</li><li class="g q"><span class="gm">·</span>Works offline — zero network requests</li><li class="g q"><span class="gm">·</span>Single-file build still opens by double-click</li></ul>
+<ul><li class="g q"><span class="gm">·</span>Holds 60fps</li><li class="g q"><span class="gm">·</span>Works offline — zero network requests</li><li class="g q"><span class="gm">·</span>Single-file build still opens by double-click</li><li class="g r"><span class="gm">✗</span>Every bar is a real image somebody has actually looked at</li></ul>
 
 <h2>Log</h2>
-<ul class="log"><li>Bar set: three.js&#x27;s own sky and grass examples are the pass mark; Red Dead Redemption 2 is the direction, not the bar.</li><li>Gates written down before any building: 60fps, zero network, single-file build still works.</li><li>Round 1 builders sent out on all four pieces in parallel, each into its own prototype so they cannot collide.</li><li>Captured the bar: three.js sky example at 1560x852, both at its sunset default and re-shot at a 38-degree sun so the comparison is like-for-like with a daytime field.</li><li>Captured our own scene at three framings to be the &#x27;before&#x27; half of each blind pair.</li><li>Searched all 588 three.js examples: there is no grass demo. webgl_instancing_scatter is the closest, so the grass bar is softer than the sky bar.</li><li>Sky: THREE.Sky is absent from r128, so it was vendored. Preetham scattering, cloud deck, crepuscular rays, aerial perspective sharing the sky&#x27;s own scatter function. 2.19 ms GPU at 1600x1000 on an M5.</li><li>Grass: 206,000 blades, 902k triangles, 5 draw calls, 6.5 ms. Blades carry a cell index rather than a position, so they stay pinned to the world while the buffer stays pinned to the camera.</li><li>Trainer: no redistributable rigged humanoid exists that is worth using - three.js&#x27;s good ones are Mixamo-licensed, the free ones are a cartoon robot and a low-poly mannequin. So the scan was kept and given a real 26-bone rig, the fused trousers cut along the surface equidistant from both leg chains, and a walk driven from the planted foot with the pelvis height derived. Foot slip 0.00 mm.</li><li>CORRECTION, and it is mine: the dog builder measured 90.2% paw slip in the CURRENT shipped gait. My earlier ground-lock test verified the phase clock against distance, not the foot against the ground - the stance sweep runs the wrong way and its amplitude is too small. The rebuild measures 4.2%.</li></ul>
+<ul class="log"><li>Bar set: three.js&#x27;s own sky and grass examples are the pass mark; Red Dead Redemption 2 is the direction, not the bar.</li><li>Gates written down before any building: 60fps, zero network, single-file build still works.</li><li>Round 1 builders sent out on all four pieces in parallel, each into its own prototype so they cannot collide.</li><li>Captured the bar: three.js sky example at 1560x852, both at its sunset default and re-shot at a 38-degree sun so the comparison is like-for-like with a daytime field.</li><li>Captured our own scene at three framings to be the &#x27;before&#x27; half of each blind pair.</li><li>Searched all 588 three.js examples: there is no grass demo. webgl_instancing_scatter is the closest, so the grass bar is softer than the sky bar.</li><li>Sky: THREE.Sky is absent from r128, so it was vendored. Preetham scattering, cloud deck, crepuscular rays, aerial perspective sharing the sky&#x27;s own scatter function. 2.19 ms GPU at 1600x1000 on an M5.</li><li>Grass: 206,000 blades, 902k triangles, 5 draw calls, 6.5 ms. Blades carry a cell index rather than a position, so they stay pinned to the world while the buffer stays pinned to the camera.</li><li>Trainer: no redistributable rigged humanoid exists that is worth using - three.js&#x27;s good ones are Mixamo-licensed, the free ones are a cartoon robot and a low-poly mannequin. So the scan was kept and given a real 26-bone rig, the fused trousers cut along the surface equidistant from both leg chains, and a walk driven from the planted foot with the pelvis height derived. Foot slip 0.00 mm.</li><li>CORRECTION, and it is mine: the dog builder measured 90.2% paw slip in the CURRENT shipped gait. My earlier ground-lock test verified the phase clock against distance, not the foot against the ground - the stance sweep runs the wrong way and its amplitude is too small. The rebuild measures 4.2%.</li><li>VOID: the daytime sky bar was blown out to near-white (RGB 224-255, 31 levels of range). I raised the sun and exposure in the example&#x27;s own GUI and shipped the result without looking at it.</li><li>VOID: the grass bar was not grass. three.js has no grass demo; instancing-scatter scatters coloured shapes over a blob surface. I picked it off a filename search.</li><li>New gate added, because this is the failure the whole method warns about: every bar must be an image somebody has actually opened and looked at before a critic is allowed to judge against it.</li><li>Grass has no bar C at all — three.js ships nothing comparable — so grass is promoted to bar A, Red Dead Redemption 2, which is where it should have been from the start.</li><li>Sky bar reverts to the example&#x27;s own shipped default, which captured correctly (RGB 48-255). Ours gets matched to that sun rather than dragging the bar to ours.</li><li>Critics found real faults in our work regardless: same-side arm swing on the man, a pace fragment on the dog, binary cloud edges on the sky, inverted density on the grass. 0 of 4 shippable.</li></ul>
 
 <footer>Each piece gets a builder and a separate critic with fresh context.<br>
 The critic opens BioDigital, compares blind with labels stripped, and sends it back until ours wins.</footer>
